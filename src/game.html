@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>นักธรรมตกปลา</title>
+<style>
+:root{--ink:#1a1c2c;--panel:#fff8e7;--gold:#ffcd4b;--red:#e43b44;--green:#38b764}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#1a1c2c;font-family:"Leelawadee UI","Noto Sans Thai","Sarabun",Tahoma,sans-serif;color:var(--ink);-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;left:0;right:0;top:0;padding:8px 12px 0;display:none;flex-direction:column;gap:6px;pointer-events:none;z-index:2}
+.bar{display:flex;align-items:center;gap:10px;justify-content:space-between;font-weight:700;color:#fff;font-size:clamp(14px,2.2vw,24px);text-shadow:0 2px 0 #000}
+.bar>div{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#lives{letter-spacing:2px;color:var(--red)}
+#timer{min-width:3.4em;text-align:center;background:var(--ink);border:3px solid #fff;border-radius:8px;padding:0 8px}
+#timer.low{background:var(--red);animation:blink .5s infinite alternate}
+@keyframes blink{to{transform:scale(1.12)}}
+#quit{pointer-events:auto;background:#0007;color:#fff;border:2px solid #fff8;border-radius:8px;font:inherit;font-size:.75em;padding:0 10px;cursor:pointer}
+#qbox{background:var(--panel);border:4px solid var(--ink);box-shadow:0 4px 0 #0008;border-radius:10px;padding:6px 14px;font-size:clamp(16px,2.6vw,30px);font-weight:700;line-height:1.35;text-align:center;max-width:1100px;width:100%;margin:0 auto}
+.screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;z-index:5;background:#0b0f2ab8}
+.screen.on{display:flex}
+.card{background:var(--panel);border:5px solid var(--ink);border-radius:14px;box-shadow:0 6px 0 #000a;padding:clamp(16px,3vw,32px);width:min(720px,100%);max-height:100%;overflow:auto;text-align:center}
+h1{font-size:clamp(32px,6.5vw,64px);color:#1f5e9c;text-shadow:3px 3px 0 var(--gold);line-height:1.2}
+h2{font-size:clamp(22px,4vw,40px);margin-bottom:6px}
+p{font-size:clamp(15px,2.2vw,21px);margin:8px 0;line-height:1.5}
+.how{text-align:left;display:inline-block;font-size:clamp(14px,2vw,19px);line-height:1.6;margin:6px 0}
+input{font:inherit;font-size:clamp(18px,3vw,26px);padding:8px 12px;border:4px solid var(--ink);border-radius:10px;width:min(360px,100%);text-align:center;margin:8px 0;user-select:text}
+.btn{font:inherit;font-weight:700;font-size:clamp(17px,2.6vw,24px);padding:10px 22px;margin:6px;border:4px solid var(--ink);border-radius:12px;background:var(--gold);box-shadow:0 4px 0 var(--ink);cursor:pointer;color:var(--ink)}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.btn.alt{background:#b8d6ff}.btn.small{font-size:15px;padding:6px 14px;background:#e9e3d3}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:clamp(15px,2.4vw,22px)}
+th,td{border-bottom:2px solid #d9cba8;padding:6px 8px}th{background:var(--ink);color:#fff}
+tr.top td{background:#ffe9a8;font-weight:700}
+#introQ{font-size:clamp(22px,4.2vw,46px);font-weight:700;line-height:1.4;margin:10px 0}
+#introN{font-size:clamp(18px,2.6vw,26px);color:#1f5e9c;font-weight:700}
+#count{font-size:clamp(16px,2.2vw,22px);color:#5d6b8c}
+#msg{position:fixed;left:50%;bottom:3%;transform:translateX(-50%);width:min(900px,94%);background:var(--panel);border:4px solid var(--ink);border-radius:12px;padding:8px 14px;font-size:clamp(15px,2.3vw,24px);font-weight:700;text-align:center;display:none;z-index:3;box-shadow:0 4px 0 #000a;line-height:1.4}
+#msg.good{background:#c8f7c5}#msg.bad{background:#ffd1d1}
+#msg small{display:block;font-weight:500;font-size:.8em}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div class="bar">
+    <div><span id="hGroup"></span><span id="lives"></span></div>
+    <div><span>คะแนน <b id="hScore">0</b></span><span id="timer">20</span><button id="quit">จบกลุ่มนี้</button></div>
+  </div>
+  <div id="qbox"></div>
+</div>
+<div id="msg"></div>
+
+<section class="screen on" id="sMenu"><div class="card">
+  <h1>นักธรรมตกปลา</h1>
+  <p>ตกปลาที่ถือคำตอบถูก · ธรรมศึกษาชั้นตรี</p>
+  <div class="how">
+    🎣 เบ็ดแกว่งไปมา กด <b>เว้นวรรค</b> / คลิก / แตะจอ เพื่อหย่อนเบ็ด<br>
+    ✅ เกี่ยวปลาที่ถือคำตอบถูก ได้คะแนน (ตอบเร็วยิ่งได้มาก)<br>
+    🐟 เกี่ยวผิด ปลาฟาดหน้า เสีย ๑ ชีวิต แล้วไปข้อถัดไป<br>
+    💀 ผิดครบ ๓ ครั้ง หรือหมดเวลาข้อละ ๒๐ วินาที = จบเกม<br>
+    ✨ ปลาทองโบนัส เกี่ยวได้ ชีวิตคืน ๑ (มีครั้งเดียว)
+  </div><br>
+  <input id="gName" maxlength="24" placeholder="ชื่อกลุ่ม">
+  <br><button class="btn" id="bStart">เริ่มตกปลา</button>
+  <button class="btn alt" id="bBoard1">ตารางคะแนน</button>
+</div></section>
+
+<section class="screen" id="sIntro"><div class="card">
+  <div id="introN"></div>
+  <div id="introQ"></div>
+  <div id="count"></div>
+</div></section>
+
+<section class="screen" id="sOver"><div class="card">
+  <h2 id="oTitle"></h2>
+  <p id="oInfo"></p>
+  <button class="btn" id="bNext">กลุ่มถัดไป</button>
+  <button class="btn alt" id="bBoard2">ตารางคะแนนรวม</button>
+</div></section>
+
+<section class="screen" id="sBoard"><div class="card">
+  <h2>🏆 ตารางคะแนนรวม</h2>
+  <div id="tbl"></div>
+  <button class="btn" id="bBack">กลับ / เล่นกลุ่มถัดไป</button>
+  <br><button class="btn small" id="bClear">ล้างคะแนนทั้งหมด</button>
+</div></section>
+
+<script>
+const QUESTION_BANK = /*QUESTIONS*/[];
+
+// ---------- ตัวละครพิกเซล (ชุดเดียวกับเกมนักธรรมปราบกิเลส) ----------
+const PLAYER = ['...11111....','..1555551...','.155555551..','.155522221..','.152221221..','.152222221..','..1222221...','...111111...','..13333331..','.1333333331.','.1233333321.','..14444441..','..14411441..','..14411441..','..12211221..','..111..111..'];
+const PLAYER_PAL = {1:'#1a1c2c',2:'#f2c49b',3:'#f4f4f4',4:'#29366f',5:'#3b2a20'};
+const FISH = [
+  '.....1111..........','...11222211........','..1222662221...11..','.1452266222211161..',
+  '.1552222222211661..','.12333333332116661.','..113333331..1161..','....111111....11...'];
+const BOAT = ['1111111111111111111111111','1222222222222222222222221','.13333333333333333333331.','..133333333333333333331..','...1111111111111111111...'];
+const HEART = ['.22.22.','2222222','2222222','.22222.','..222..','...2...'];
+const FISH_PALS = [
+  {1:'#1a1c2c',2:'#3b8ee8',3:'#bfe3ff',4:'#fff',5:'#1a1c2c',6:'#1f5e9c'},
+  {1:'#1a1c2c',2:'#f06b9b',3:'#ffd6e4',4:'#fff',5:'#1a1c2c',6:'#b13e6a'},
+  {1:'#1a1c2c',2:'#4fc96a',3:'#d4f7c9',4:'#fff',5:'#1a1c2c',6:'#2a8a4a'},
+  {1:'#1a1c2c',2:'#a070e0',3:'#e6d6ff',4:'#fff',5:'#1a1c2c',6:'#6a40a8'}];
+const GOLD_PAL = {1:'#5a3a00',2:'#ffcd4b',3:'#fff3b0',4:'#fff',5:'#1a1c2c',6:'#e89a1a'};
+
+function sprite(data, pal){
+  const w = Math.max(...data.map(r=>r.length)), h = data.length;
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const x = c.getContext('2d');
+  data.forEach((r,y)=>[...r].forEach((ch,i)=>{ if(pal[ch]){ x.fillStyle=pal[ch]; x.fillRect(i,y,1,1); } }));
+  return c;
+}
+const SPR = {
+  player: sprite(PLAYER, PLAYER_PAL),
+  boat: sprite(BOAT, {1:'#1a1c2c',2:'#c98a4a',3:'#8a5a2a'}),
+  heart: sprite(HEART, {2:'#e43b44'}),
+  fish: FISH_PALS.map(p=>sprite(FISH,p)),
+  gold: sprite(FISH, GOLD_PAL),
+};
+
+// ---------- เสียง (สังเคราะห์ ไม่ต้องโหลดไฟล์) ----------
+let AC = null;
+function tone(f, d, type='square', v=.08, f2){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain(), t=AC.currentTime;
+    o.type=type; o.frequency.setValueAtTime(f,t); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+d);
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t+d);
+  }catch(e){}
+}
+const SFX = {
+  drop:()=>tone(600,.15,'triangle',.06,300),
+  good:()=>{tone(660,.1);setTimeout(()=>tone(880,.1),90);setTimeout(()=>tone(1320,.2),180);},
+  slap:()=>{tone(180,.18,'sawtooth',.15,60);tone(900,.06,'square',.1,200);},
+  splash:()=>tone(300,.3,'triangle',.06,80),
+  gold:()=>[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.12,'triangle',.08),i*70)),
+  tick:()=>tone(1000,.04,'square',.04),
+  over:()=>[392,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,.25,'triangle',.08),i*180)),
+};
+
+// ---------- ข้อมูลคะแนน ----------
+const KEY='dhammaFish.scores.v1';
+let scores = [];
+try{ scores = JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ scores=[]; }
+function saveScores(){ try{ localStorage.setItem(KEY, JSON.stringify(scores)); }catch(e){} }
+
+const $ = id => document.getElementById(id);
+const TH = n => String(n).replace(/\d/g, d=>'๐๑๒๓๔๕๖๗๘๙'[d]);
+const LETTERS = ['ก','ข','ค','ง'];
+const TIME = 20, LIVES = 3;
+
+let deck=[], deckPos=0;
+function nextQuestion(){
+  if(deckPos>=deck.length){ deck = QUESTION_BANK.map((_,i)=>i).sort(()=>Math.random()-.5); deckPos=0; }
+  return QUESTION_BANK[deck[deckPos++]];
+}
+
+// ---------- ฉาก ----------
+const cv=$('cv'), ctx=cv.getContext('2d');
+let W=0,H=0,DPR=1,U=4;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
+  cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  U=Math.max(3,Math.min(8,Math.round(Math.min(W,H*1.3)/170)));
+}
+addEventListener('resize',resize); resize();
+
+function layout(){
+  const hud=$('hud'); const top = hud.style.display==='flex' ? hud.getBoundingClientRect().bottom : H*.18;
+  const pTop = top + U*4;
+  const waterY = pTop + U*14;
+  const cx = W/2;
+  const pLeft = cx - U*16;
+  return {top,pTop,waterY,cx,pLeft, tipX:cx, tipY:pTop - U*2, face:{x:pLeft+U*6,y:pTop+U*4}};
+}
+
+// ---------- สถานะเกม ----------
+const G = {phase:'menu', fish:[], parts:[], pops:[], t:0, shake:0, hit:0};
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id)); }
+function msg(html, cls){ const m=$('msg'); m.className=cls||''; m.innerHTML=html; m.style.display=html?'block':'none'; }
+function hud(){
+  $('hGroup').textContent='👥 '+G.group;
+  $('hScore').textContent=TH(G.score);
+  $('lives').textContent='❤'.repeat(G.lives)+'♡'.repeat(Math.max(0,LIVES-G.lives));
+}
+
+function startGame(){
+  G.group = ($('gName').value.trim()) || ('กลุ่ม '+TH(scores.length+1));
+  Object.assign(G,{run:(G.run||0)+1,score:0,lives:LIVES,correct:0,qn:0,goldUsed:false,goldAfter:1+Math.floor(Math.random()*3)});
+  hud(); startQuestion();
+}
+
+let introTimer=null;
+function startQuestion(){
+  G.qn++; G.q = nextQuestion(); G.phase='intro'; G.fish=[]; msg('');
+  $('hud').style.display='none';
+  $('introN').textContent = 'ข้อที่ '+TH(G.qn)+' · '+G.q.category;
+  $('introQ').textContent = G.q.q;
+  show('sIntro');
+  let n=3; const tickCount=()=>{ $('count').textContent='เตรียมหย่อนเบ็ดใน '+TH(n)+' … (กดเว้นวรรค/แตะ เพื่อเริ่มเลย)'; };
+  tickCount(); clearInterval(introTimer);
+  introTimer=setInterval(()=>{ n--; if(n<=0) beginFishing(); else tickCount(); },1000);
+}
+
+function beginFishing(){
+  if(G.phase!=='intro') return;
+  clearInterval(introTimer); show(''); G.phase='play';
+  $('hud').style.display='flex';
+  $('qbox').textContent = 'ข้อ '+TH(G.qn)+'. '+G.q.q;
+  G.time=TIME; G.lastTick=TIME;
+  G.rod={state:'swing',ph:Math.random()*6,len:U*6,fish:null};
+  const L=layout(), area0=L.waterY+(H-L.waterY)*.1, area1=H-U*4;
+  const lanes=[0,1,2,3].sort(()=>Math.random()-.5);
+  const spd = 1 + Math.min(G.qn-1,10)*.04;
+  G.fish = G.q.choices.map((c,i)=>{
+    const laneY = area0 + (area1-area0)*(lanes[i]+.5)/4;
+    const dir = Math.random()<.5?-1:1;
+    return makeFish({text:LETTERS[i]+'. '+c, correct:i===G.q.answer, spr:SPR.fish[i], laneY,
+      x: W*(.15+Math.random()*.7), dir, speed: W*(.05+Math.random()*.05)*spd});
+  });
+  if(!G.goldUsed && G.lives<LIVES && G.qn>G.goldAfter && Math.random()<.6){
+    G.goldUsed=true;
+    G.fish.push(makeFish({gold:true,spr:SPR.gold,laneY:area0+(area1-area0)*(.25+Math.random()*.5),
+      x:-W*.1,dir:1,speed:W*.16*spd}));
+    pop(W/2, L.waterY+U*8, '✨ ปลาทองโบนัสมาแล้ว!', '#ffcd4b');
+  }
+  hud();
+}
+
+function fontPx(){ return Math.max(14,Math.min(26,Math.min(W,H*1.4)*.028)); }
+const seg = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('th',{granularity:'word'}) : null;
+function wrap(text, maxW){
+  const parts = seg ? [...seg.segment(text)].map(s=>s.segment) : [...text];
+  const lines=[]; let cur='';
+  for(const p of parts){ if(cur && ctx.measureText(cur+p).width>maxW){ lines.push(cur.trim()); cur=p; } else cur+=p; }
+  if(cur.trim()) lines.push(cur.trim()); return lines;
+}
+function makeFish(o){
+  const fu = o.gold ? U*1.1 : U*1.35;
+  const f = Object.assign({state:'swim',alpha:1,wob:Math.random()*6,fu,fw:19*fu,fh:8*fu,lines:[],lw:0,lh:0},o);
+  if(o.text){
+    const fs=fontPx(); ctx.font=`700 ${fs}px ${FONT}`;
+    f.fs=fs; f.lines=wrap(o.text, Math.min(W*.4,380));
+    f.lw=Math.max(...f.lines.map(l=>ctx.measureText(l).width))+fs*1.1;
+    f.lh=f.lines.length*fs*1.3+fs*.5;
+  }
+  f.half=Math.max(f.fw,f.lw)/2;
+  return f;
+}
+const FONT='"Leelawadee UI","Noto Sans Thai","Sarabun",Tahoma,sans-serif';
+
+function pop(x,y,text,color,size){ G.pops.push({x,y,text,color,size:size||fontPx()*1.3,t:0}); }
+function burst(x,y,colors,n=18){ for(let i=0;i<n;i++){ const a=Math.random()*6.28,s=60+Math.random()*220; G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,t:0,life:.6+Math.random()*.5,c:colors[i%colors.length]}); } }
+
+function action(){
+  if(G.phase==='intro'){ beginFishing(); return; }
+  if(G.phase==='play' && G.rod.state==='swing'){ G.rod.state='drop'; SFX.drop(); }
+}
+addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='Enter'){
+    if(G.phase==='intro'||G.phase==='play'||G.phase==='resolve'){ e.preventDefault(); action(); }
+  }
+});
+cv.addEventListener('pointerdown',e=>{ e.preventDefault(); action(); });
+$('sIntro').addEventListener('pointerdown',e=>{ e.preventDefault(); action(); });
+
+function tip(L){ const r=G.rod, a=Math.sin(r.ph)*r.amp; return {x:L.tipX+Math.sin(a)*r.len, y:L.tipY+Math.cos(a)*r.len, a}; }
+
+function update(dt){
+  G.t+=dt; G.shake=Math.max(0,G.shake-dt); G.hit=Math.max(0,G.hit-dt);
+  const L=layout();
+  for(const f of G.fish){
+    if(f.state==='swim'){
+      f.wob+=dt*4; f.x+=f.dir*f.speed*dt*(f.leave?2.5:1);
+      if(f.leave){ f.alpha-=dt*1.2; }
+      else if(f.x-f.half<0 && f.dir<0 || f.x+f.half>W && f.dir>0){ if(!(f.gold && f.x<0)) f.dir*=-1; }
+      if(f.gold && f.x>W*.5 && Math.random()<dt*.3) f.dir*=-1;
+    } else if(f.state==='slap'){
+      f.st+=dt/.5; const k=Math.min(1,f.st);
+      f.x=f.sx+(L.face.x-f.sx)*k; f.y0=f.sy+(L.face.y-f.sy)*k - Math.sin(k*Math.PI)*U*25;
+      f.rot=k*Math.PI*3;
+      if(k>=1){ f.state='sink'; f.vy=-U*30; f.vx=U*20; slapImpact(f); }
+    } else if(f.state==='sink'){
+      f.vy+=U*120*dt; f.x+=f.vx*dt; f.y0+=f.vy*dt; f.rot+=dt*4;
+      if(f.y0>L.waterY && !f.splashed){ f.splashed=true; SFX.splash(); burst(f.x,L.waterY,['#bfe3ff','#fff'],14); f.vy=U*15; f.vx=0; }
+      if(f.splashed){ f.vy=U*15; f.alpha-=dt*.6; }
+    }
+  }
+  G.fish=G.fish.filter(f=>f.alpha>0 && f.x>-W*.3 && f.x<W*1.3);
+
+  if(G.phase==='play'){
+    G.time-=dt;
+    const s=Math.ceil(G.time); if(s<G.lastTick){ G.lastTick=s; if(s<=5&&s>0) SFX.tick(); }
+    if(G.time<=0){ G.time=0; timeout(); }
+  }
+  const r=G.rod;
+  if(r && (G.phase==='play'||G.phase==='resolve')){
+    r.amp = W>H ? 1.0 : .75;
+    if(r.state==='swing'){ r.ph+=dt*(1.7+Math.min(G.qn,10)*.05); r.len+= (U*6-r.len)*Math.min(1,dt*8); }
+    else if(r.state==='drop'){
+      r.len+=H*.85*dt; const p=tip(L);
+      if(G.phase==='play') for(const f of G.fish){
+        if(f.state!=='swim'||f.leave) continue;
+        const top=f.laneY-(f.fh+f.lh)/2;
+        if(Math.abs(p.x-f.x)<f.half+U && p.y>top-U && p.y<top+f.fh+f.lh+U){ r.fish=f; f.state='hooked'; r.state='reel'; tone(400,.08); break; }
+      }
+      if(p.y>H-U*3||p.x<0||p.x>W) r.state='reel';
+    } else if(r.state==='reel'){
+      r.len-=H*(r.fish?.9:1.2)*dt;
+      if(r.fish){ const p=tip(L); r.fish.x=p.x; r.fish.laneY=p.y+(r.fish.fh+r.fish.lh)/2; }
+      if(r.len<=U*6){ r.len=U*6; const f=r.fish; r.fish=null; r.state='swing'; landed(f,L); }
+    }
+  }
+  for(const p of G.parts){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=400*dt; }
+  G.parts=G.parts.filter(p=>p.t<p.life);
+  for(const p of G.pops) p.t+=dt; G.pops=G.pops.filter(p=>p.t<1.4);
+
+  if(G.phase==='play'){ const t=$('timer'); t.textContent='⏱ '+TH(Math.ceil(G.time)); t.classList.toggle('low',G.time<=5); }
+}
+
+function landed(f,L){
+  if(!f || G.phase!=='play') return;
+  if(f.gold){
+    G.fish=G.fish.filter(x=>x!==f); G.lives=Math.min(LIVES,G.lives+1); hud(); SFX.gold();
+    burst(L.tipX,L.tipY,['#ffcd4b','#fff3b0','#fff'],26); pop(L.tipX,L.tipY-U*6,'+๑ ชีวิต ❤','#ff6b7a');
+    return;
+  }
+  G.phase='resolve';
+  G.fish.forEach(x=>{ if(x!==f){ x.leave=true; } });
+  if(f.correct){
+    const pts = 100 + Math.ceil(G.time)*5;
+    G.score+=pts; G.correct++; hud(); SFX.good();
+    G.fish=G.fish.filter(x=>x!==f);
+    burst(L.tipX,L.tipY,['#ffcd4b','#38b764','#fff','#3b8ee8'],30);
+    pop(L.tipX,L.tipY-U*6,'ถูกต้อง! +'+TH(pts),'#38b764');
+    msg('✅ ถูกต้อง! <small>'+esc(G.q.explain||'')+'</small>','good');
+    later(startQuestion, 2300);
+  } else {
+    f.state='slap'; f.st=0; f.sx=f.x; f.sy=L.tipY; f.y0=f.sy; f.rot=0;
+  }
+}
+function slapImpact(f){
+  const L=layout();
+  G.lives--; hud(); SFX.slap(); G.shake=.45; G.hit=.8;
+  burst(L.face.x,L.face.y,['#fff','#ffcd4b','#e43b44'],22);
+  pop(L.face.x+U*4,L.face.y-U*4,'ฟาด!!','#e43b44',fontPx()*2);
+  const ans = LETTERS[G.q.answer]+'. '+G.q.choices[G.q.answer];
+  msg('❌ ผิด! คำตอบที่ถูกคือ '+esc(ans)+'<small>'+esc(G.q.explain||'')+'</small>','bad');
+  later(()=>{ if(G.lives<=0) gameOver('ผิดครบ ๓ ครั้ง'); else startQuestion(); }, 3600);
+}
+function timeout(){
+  G.phase='resolve'; G.fish.forEach(f=>f.leave=true); if(G.rod) G.rod.state='reel';
+  const ans = LETTERS[G.q.answer]+'. '+G.q.choices[G.q.answer];
+  msg('⏰ หมดเวลา! คำตอบที่ถูกคือ '+esc(ans)+'<small>'+esc(G.q.explain||'')+'</small>','bad');
+  later(()=>gameOver('หมดเวลา'), 3200);
+}
+function later(fn,ms){ const id=G.run; setTimeout(()=>{ if(G.run===id && G.phase==='resolve') fn(); },ms); }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function gameOver(why){
+  if(G.phase==='over'||G.phase==='menu') return;
+  G.phase='over'; msg(''); $('hud').style.display='none'; SFX.over(); clearInterval(introTimer);
+  const entry={name:G.group,score:G.score,correct:G.correct,at:Date.now()};
+  scores.push(entry); saveScores();
+  const rank=[...scores].sort((a,b)=>b.score-a.score||b.correct-a.correct).indexOf(entry)+1;
+  $('oTitle').textContent='จบเกม: '+why;
+  $('oInfo').innerHTML=`<b>${esc(G.group)}</b><br>ตอบถูก ${TH(G.correct)} ข้อ · คะแนน <b>${TH(G.score)}</b><br>ตอนนี้อยู่อันดับที่ ${TH(rank)} จาก ${TH(scores.length)} กลุ่ม`;
+  show('sOver');
+}
+function board(){
+  const rows=[...scores].sort((a,b)=>b.score-a.score||b.correct-a.correct);
+  $('tbl').innerHTML = rows.length ? '<table><tr><th>อันดับ</th><th>กลุ่ม</th><th>ถูก</th><th>คะแนน</th></tr>'+
+    rows.map((r,i)=>`<tr class="${i===0?'top':''}"><td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':TH(i+1)}</td><td>${esc(r.name)}</td><td>${TH(r.correct)}</td><td><b>${TH(r.score)}</b></td></tr>`).join('')+'</table>'
+    : '<p>ยังไม่มีกลุ่มเล่น</p>';
+  show('sBoard');
+}
+function toMenu(){ G.phase='menu'; G.fish=[]; G.rod=null; $('gName').value=''; $('gName').placeholder='กลุ่ม '+TH(scores.length+1); show('sMenu'); }
+
+$('bStart').onclick=startGame;
+$('gName').addEventListener('keydown',e=>{ if(e.key==='Enter') startGame(); });
+$('bBoard1').onclick=$('bBoard2').onclick=board;
+$('bNext').onclick=$('bBack').onclick=toMenu;
+$('bClear').onclick=()=>{ if(confirm('ล้างคะแนนของทุกกลุ่ม?')){ scores=[]; saveScores(); board(); } };
+$('quit').onclick=()=>{ if(confirm('จบเกมของกลุ่มนี้และบันทึกคะแนน?')) gameOver('ครูสั่งจบ'); };
+$('gName').placeholder='กลุ่ม '+TH(scores.length+1);
+
+// ---------- วาด ----------
+function px(img,x,y,s,flip,rot,alpha){
+  ctx.save(); ctx.globalAlpha=alpha==null?1:Math.max(0,alpha); ctx.translate(x,y);
+  if(rot) ctx.rotate(rot); if(flip) ctx.scale(-1,1);
+  ctx.drawImage(img,-img.width*s/2,-img.height*s/2,img.width*s,img.height*s); ctx.restore();
+}
+function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function drawFish(f){
+  const top = f.y0!=null && f.state!=='swim' && f.state!=='hooked' ? f.y0-(f.fh)/2 : f.laneY-(f.fh+f.lh)/2;
+  const fy = top+f.fh/2 + (f.state==='swim'?Math.sin(f.wob)*U*.8:0);
+  const flip = f.dir>0;
+  ctx.save(); ctx.globalAlpha=Math.max(0,f.alpha);
+  if(f.gold){ ctx.shadowColor='#ffe066'; ctx.shadowBlur=U*6+Math.sin(G.t*8)*U*3; }
+  px(f.spr,f.x,fy,f.fu,flip,f.state==='hooked'?-Math.PI/2*(flip?-1:1)*.6:f.rot||0,f.alpha);
+  ctx.restore();
+  if(f.lines.length && (f.state==='swim'||f.state==='hooked')){
+    const ly=top+f.fh+U*.5, lx=f.x-f.lw/2, mouth=f.x+(flip?1:-1)*f.fw*.42;
+    ctx.save(); ctx.globalAlpha=Math.max(0,f.alpha);
+    ctx.strokeStyle='#1a1c2c'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(mouth,fy+U); ctx.lineTo(f.x+(flip?1:-1)*f.lw*.3,ly+2); ctx.stroke();
+    rrect(lx,ly,f.lw,f.lh,8); ctx.fillStyle='#fff8e7'; ctx.fill(); ctx.lineWidth=3; ctx.stroke();
+    ctx.fillStyle='#1a1c2c'; ctx.font=`700 ${f.fs}px ${FONT}`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    f.lines.forEach((l,i)=>ctx.fillText(l,f.x,ly+f.fs*.25+f.fs*1.3*(i+.5)));
+    ctx.restore();
+  }
+}
+
+function draw(){
+  const L=layout();
+  ctx.save();
+  if(G.shake>0) ctx.translate((Math.random()-.5)*U*4*G.shake/.45,(Math.random()-.5)*U*4*G.shake/.45);
+  ctx.imageSmoothingEnabled=false;
+  // ฟ้า
+  let g=ctx.createLinearGradient(0,0,0,L.waterY); g.addColorStop(0,'#5fb7f0'); g.addColorStop(1,'#ffe2a8');
+  ctx.fillStyle=g; ctx.fillRect(-20,-20,W+40,L.waterY+20);
+  ctx.fillStyle='#fff3b0'; ctx.beginPath(); ctx.arc(W*.85,L.waterY*.55,U*8,0,7); ctx.fill();
+  ctx.fillStyle='#ffffffcc'; for(let i=0;i<3;i++){ const cx=((G.t*U*3+i*W*.4)%(W+200))-100, cy=L.waterY*(.3+i*.15); ctx.fillRect(cx,cy,U*14,U*3); ctx.fillRect(cx+U*3,cy-U*2,U*7,U*2); }
+  // น้ำ
+  g=ctx.createLinearGradient(0,L.waterY,0,H); g.addColorStop(0,'#2a8fd0'); g.addColorStop(1,'#123a6b');
+  ctx.fillStyle=g; ctx.fillRect(-20,L.waterY,W+40,H-L.waterY+20);
+  ctx.fillStyle='#bfe3ff'; for(let x=-U*8;x<W+U*8;x+=U*8){ const o=(G.t*U*6)%(U*8); ctx.fillRect(x+o,L.waterY+Math.sin((x+o)/40+G.t*2)*U*.6,U*4,U); }
+  // พื้นทราย + สาหร่าย
+  ctx.fillStyle='#c9a35a'; ctx.fillRect(-20,H-U*3,W+40,U*4);
+  ctx.fillStyle='#2a8a4a'; for(let i=0;i<9;i++){ const x=W*(i+.5)/9, h=U*(6+(i*7)%9); for(let k=0;k<h/U;k++) ctx.fillRect(x+Math.sin(G.t*2+k*.6+i)*U*.8,H-U*3-k*U,U,U); }
+  // ฟองอากาศ
+  ctx.fillStyle='#ffffff55'; for(let i=0;i<14;i++){ const x=(i*137)%W, y=H-((G.t*U*8+i*90)%(H-L.waterY)); ctx.fillRect(x+Math.sin(G.t+i)*U,y,U,U); }
+
+  // ปลา (ว่าย)
+  G.fish.filter(f=>f.state==='swim').forEach(drawFish);
+
+  // เรือ + ตัวละคร
+  const bob=Math.sin(G.t*2)*U*.6, hitX=G.hit>0?-Math.sin(G.hit*20)*U*1.5:0;
+  px(SPR.player,L.pLeft+U*6+hitX,L.pTop+U*8+bob,U,false,G.hit>0?-.25:0);
+  if(G.hit>0){ ctx.fillStyle='#e43b4499'; ctx.fillRect(L.pLeft+U*2+hitX,L.pTop+U*3+bob,U*7,U*3); }
+  px(SPR.boat,L.pLeft+U*7,L.waterY+U*.5+bob,U);
+  // คันเบ็ด
+  ctx.strokeStyle='#5a3a1a'; ctx.lineWidth=U; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(L.pLeft+U*10,L.pTop+U*10+bob); ctx.lineTo(L.tipX,L.tipY+bob); ctx.stroke();
+  const r=G.rod;
+  if(r && G.phase!=='menu'){
+    const p=tip(L);
+    ctx.strokeStyle='#ffffffdd'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(L.tipX,L.tipY+bob); ctx.lineTo(p.x,p.y); ctx.stroke();
+    // เบ็ด
+    ctx.strokeStyle='#d8d8e0'; ctx.lineWidth=Math.max(2,U*.7);
+    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x,p.y+U*3); ctx.arc(p.x-U*1.5,p.y+U*3,U*1.5,0,Math.PI*.9); ctx.stroke();
+    ctx.fillStyle='#e43b44'; ctx.fillRect(p.x-U,p.y-U*1.5,U*2,U*1.5);
+    if(r.state==='swing' && G.phase==='play'){
+      ctx.setLineDash([U,U*2]); ctx.strokeStyle='#ffffff55'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p.x,p.y);
+      ctx.lineTo(L.tipX+Math.sin(p.a)*(H-L.tipY)*1.2,L.tipY+Math.cos(p.a)*(H-L.tipY)*1.2); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  G.fish.filter(f=>f.state!=='swim').forEach(drawFish);
+
+  for(const p of G.parts){ ctx.fillStyle=p.c; ctx.globalAlpha=1-p.t/p.life; ctx.fillRect(p.x,p.y,U*1.2,U*1.2); }
+  ctx.globalAlpha=1;
+  for(const p of G.pops){
+    ctx.font=`800 ${p.size}px ${FONT}`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const y=p.y-p.t*U*10; ctx.globalAlpha=Math.min(1,(1.4-p.t)*2);
+    ctx.lineWidth=6; ctx.strokeStyle='#1a1c2c'; ctx.strokeText(p.text,Math.max(80,Math.min(W-80,p.x)),y); ctx.fillStyle=p.color; ctx.fillText(p.text,Math.max(80,Math.min(W-80,p.x)),y);
+  }
+  ctx.globalAlpha=1; ctx.restore();
+}
+
+let last=performance.now();
+function loop(now){ const dt=Math.min(.1,(now-last)/1000); last=now; update(dt); draw(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
