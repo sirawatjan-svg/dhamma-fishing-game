@@ -16,7 +16,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #timer{min-width:3.4em;text-align:center;background:#1a1c2ccc;border:3px solid #fff;border-radius:10px;padding:0 8px}
 #timer.low{background:var(--red);animation:blink .5s infinite alternate}
 @keyframes blink{to{transform:scale(1.12)}}
-#quit{pointer-events:auto;background:#0007;color:#fff;border:2px solid #fff8;border-radius:8px;font:inherit;font-size:.75em;padding:0 10px;cursor:pointer}
+#quit,#mute{pointer-events:auto;background:#0007;color:#fff;border:2px solid #fff8;border-radius:8px;font:inherit;font-size:.75em;padding:0 10px;cursor:pointer}
 #qbox{background:#fff8e7f2;border:3px solid #3b2a20;box-shadow:0 6px 16px #0006;border-radius:12px;padding:6px 14px;font-size:clamp(16px,2.6vw,30px);font-weight:700;line-height:1.35;text-align:center;max-width:1100px;width:100%;margin:0 auto}
 .screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;z-index:5;background:#06203acc}
 .screen.on{display:flex}
@@ -51,7 +51,7 @@ tr.top td{background:#ffe9a8;font-weight:700}
 <div id="hud">
   <div class="bar">
     <div><span id="hGroup"></span><span id="lives"></span></div>
-    <div><span>คะแนน <b id="hScore">0</b></span><span id="timer">20</span><button id="quit">จบรอบนี้</button></div>
+    <div><span>คะแนน <b id="hScore">0</b></span><span id="timer">20</span><button id="mute"></button><button id="quit">จบรอบนี้</button></div>
   </div>
   <div id="qbox"></div>
 </div>
@@ -113,7 +113,7 @@ function tone(f, d, type='square', v=.08, f2){
     const A=ac(), o=A.createOscillator(), g=A.createGain(), t=A.currentTime;
     o.type=type; o.frequency.setValueAtTime(f,t); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+d);
     g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
-    o.connect(g).connect(A.destination); o.start(t); o.stop(t+d);
+    o.connect(g).connect(out()); o.start(t); o.stop(t+d);
   }catch(e){}
 }
 function noise(d, v, freq){
@@ -122,9 +122,36 @@ function noise(d, v, freq){
     for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
     const s=A.createBufferSource(), f=A.createBiquadFilter(), g=A.createGain();
     s.buffer=b; f.type='bandpass'; f.frequency.value=freq; f.Q.value=.8; g.gain.value=v;
-    s.connect(f).connect(g).connect(A.destination); s.start();
+    s.connect(f).connect(g).connect(out()); s.start();
   }catch(e){}
 }
+let MASTER=null, MUTED=false; try{ MUTED=localStorage.getItem('dhammaFish.mute')==='1'; }catch(e){}
+function out(){ const A=ac(); if(!MASTER){ MASTER=A.createGain(); MASTER.gain.value=MUTED?0:1; MASTER.connect(A.destination); } return MASTER; }
+function nz(d,v,type,freq,delay=0,f2){
+  try{
+    const A=ac(), n=Math.floor(A.sampleRate*d), b=A.createBuffer(1,n,A.sampleRate), ch=b.getChannelData(0), t=A.currentTime+delay;
+    for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/n,3);
+    const src=A.createBufferSource(), f=A.createBiquadFilter(), g=A.createGain();
+    src.buffer=b; f.type=type; f.frequency.setValueAtTime(freq,t); if(f2) f.frequency.exponentialRampToValueAtTime(f2,t+d); g.gain.value=v;
+    src.connect(f).connect(g).connect(out()); src.start(t);
+  }catch(e){}
+}
+function drips(n){ for(let i=0;i<n;i++) setTimeout(()=>tone(1400+Math.random()*900,.05,'sine',.05,700),80+Math.random()*380); }
+let AMB=false;
+function ambient(){ // เสียงคลื่นเบา ๆ วนตลอด
+  if(AMB) return; AMB=true;
+  try{
+    const A=ac(), n=A.sampleRate*4, b=A.createBuffer(1,n,A.sampleRate), ch=b.getChannelData(0); let last=0;
+    for(let i=0;i<n;i++){ last=(last+.02*(Math.random()*2-1))/1.02; ch[i]=last*3.5; }
+    const src=A.createBufferSource(), f=A.createBiquadFilter(), g=A.createGain(), lfo=A.createOscillator(), lg=A.createGain();
+    src.buffer=b; src.loop=true; f.type='lowpass'; f.frequency.value=480; g.gain.value=.05; lfo.frequency.value=.13; lg.gain.value=.025;
+    lfo.connect(lg).connect(g.gain); src.connect(f).connect(g).connect(out()); src.start(); lfo.start();
+  }catch(e){}
+}
+let TH_VOICE=null;
+function loadVoice(){ try{ TH_VOICE=speechSynthesis.getVoices().find(v=>/^th/i.test(v.lang))||null; }catch(e){} }
+try{ loadVoice(); speechSynthesis.onvoiceschanged=loadVoice; }catch(e){}
+function say(t){ try{ if(!TH_VOICE||MUTED) return; const u=new SpeechSynthesisUtterance(t); u.voice=TH_VOICE; u.lang=TH_VOICE.lang; u.rate=1.15; u.pitch=1.6; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
 const SFX = {
   drop:()=>noise(.18,.25,1400),
   hook:()=>tone(420,.08,'triangle',.1),
@@ -145,6 +172,15 @@ const SFX = {
 };
 
 // ---------- ข้อมูลคะแนน ----------
+Object.assign(SFX,{
+  drop:()=>nz(.35,.55,'bandpass',300,0,2400),
+  plop:()=>{ tone(900,.12,'sine',.12,220); nz(.18,.35,'bandpass',700,.02); },
+  click:()=>tone(3400,.012,'square',.018),
+  slapS:()=>{ nz(.03,1.8,'highpass',2800); nz(.1,.9,'bandpass',1200); tone(150,.12,'sine',.25,55); nz(.22,.35,'lowpass',900,.02); drips(2); },
+  slap:()=>{ nz(.04,2.6,'highpass',2400); nz(.16,1.4,'bandpass',1000); tone(120,.2,'sine',.45,40); nz(.4,.6,'lowpass',700,.03); drips(4); },
+  splash:()=>{ nz(.5,.6,'bandpass',800,0,300); drips(3); },
+  tweet:()=>{ tone(2300,.05,'sine',.025,2900); setTimeout(()=>tone(2500,.05,'sine',.025,3100),90); },
+});
 const KEY='dhammaFish.rounds.v1';
 let scores = [];
 try{ scores = JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ scores=[]; }
@@ -186,7 +222,7 @@ const fishLen = () => Math.max(55, Math.min(150, Math.min(W, H*1.3)*.115));
 function fontPx(){ return Math.max(14,Math.min(26,Math.min(W,H*1.4)*.028)); }
 
 // ---------- สถานะเกม ----------
-const G = {phase:'menu', fish:[], parts:[], pops:[], t:0, shake:0, hit:0, cheek:0, run:0, jdir:1, swell:0, dizzy:0, spinT:0, hatOff:null, tooth:null};
+const G = {phase:'menu', fish:[], parts:[], pops:[], t:0, shake:0, hit:0, cheek:0, run:0, jdir:1, swell:0, dizzy:0, spinT:0, hatOff:null, tooth:null, squash:0, freeze:0, rings:[], cam:{z:1,x:0,y:0}};
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id)); }
 function msg(html, cls){ const m=$('msg'); m.className=cls||''; m.innerHTML=html; m.style.display=html?'block':'none'; }
 function hud(){
@@ -198,14 +234,14 @@ function later(fn,ms){ const id=G.run; setTimeout(()=>{ if(G.run===id && G.phase
 function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function startGame(){
-  G.round = scores.length+1; G.t0 = Date.now();
+  G.round = scores.length+1; G.t0 = Date.now(); ambient();
   Object.assign(G,{run:G.run+1,score:0,lives:LIVES,correct:0,qn:0,goldUsed:false,goldAfter:1+Math.floor(Math.random()*3),cheek:0});
   hud(); startQuestion();
 }
 
 let introTimer=null;
 function startQuestion(){
-  G.qn++; G.q = nextQuestion(); Object.assign(G,{swell:0,dizzy:0,spinT:0,hatOff:null,tooth:null,cheek:0,hit:0}); G.phase='intro'; G.fish=[]; G.rod=null; msg('');
+  G.qn++; G.q = nextQuestion(); Object.assign(G,{squash:0,swell:0,dizzy:0,spinT:0,hatOff:null,tooth:null,cheek:0,hit:0}); G.phase='intro'; G.fish=[]; G.rod=null; msg('');
   $('hud').style.display='none';
   $('introN').textContent = 'ข้อที่ '+TH(G.qn)+' · '+G.q.category;
   $('introQ').textContent = G.q.q;
@@ -278,7 +314,11 @@ function swimY(f){ return f.laneY-(f.fh+f.lh)/2+f.fh/2; }
 function update(dt){
   G.t+=dt; G.shake=Math.max(0,G.shake-dt); G.hit=Math.max(0,G.hit-dt); G.cheek=Math.max(0,G.cheek-dt*.08);
   G.spinT=Math.max(0,G.spinT-dt); G.swell=Math.max(0,G.swell-dt*.05);
-  if(G.dizzy>0){ G.dizzy-=dt; if(Math.floor(G.dizzy*1.5)!==Math.floor((G.dizzy+dt)*1.5)) SFX.tweet(); }
+  if(G.dizzy>0){ G.dizzy-=dt; if(Math.floor(G.dizzy*.8)!==Math.floor((G.dizzy+dt)*.8)) SFX.tweet(); }
+  G.squash=Math.max(0,G.squash-dt*2.2);
+  for(const g of G.rings) g.t+=dt; G.rings=G.rings.filter(g=>g.t<.3);
+  { const L1=layout(), sf=G.fish.find(f=>f.state==='slap'), zt=((sf && sf.an.t>T_IN*.6) || G.dizzy>2.6)?2.1:1;
+    G.cam.z+=(zt-G.cam.z)*Math.min(1,dt*(zt>1?6:3)); G.cam.x=L1.head.x+L1.S*5; G.cam.y=L1.head.y+L1.S*2; }
   { const L0=layout(), g=L0.S*90;
     for(const o of [G.hatOff,G.tooth]) if(o && !o.float){ o.vy+=g*dt; o.x+=o.vx*dt; o.y+=o.vy*dt; o.rot+=(o.vr||14)*dt;
       if(o.y>L0.waterY){ o.float=true; SFX.splash(); burst(o.x,L0.waterY,['#d8f0ff','#fff'],12,180); } }
@@ -293,7 +333,7 @@ function update(dt){
       else if(f.x-f.half<0 && f.dir<0 || f.x+f.half>W && f.dir>0){ if(!(f.gold && f.x<0)) f.dir*=-1; }
       if(f.gold && f.x>W*.5 && Math.random()<dt*.3) f.dir*=-1;
       f.y=swimY(f)+Math.sin(f.wob*.6)*S*.5; f.flip=f.dir>0; f.rot=0;
-    } else if(f.state==='slap') slapUpdate(f,dt,L);
+    } else if(f.state==='slap'){ slapUpdate(f,dt,L); if(f.strike>0){ (f.trail=f.trail||[]).unshift({x:f.x,y:f.y,rot:f.rot}); if(f.trail.length>4) f.trail.pop(); } else f.trail=[]; }
     else if(f.state==='sink'){
       f.vy+=S*60*dt; f.x+=f.vx*dt; f.y+=f.vy*dt; f.rot+=dt*5;
       if(!f.splashed && f.y>L.waterY){ f.splashed=true; SFX.splash(); burst(f.x,L.waterY,['#d8f0ff','#fff','#9fd3f5'],26,260); }
@@ -316,6 +356,7 @@ function update(dt){
     if(r.state==='swing'){ r.ph+=dt*(1.7+Math.min(G.qn,10)*.05); r.a=Math.sin(r.ph)*amp; r.len+=(S*4-r.len)*Math.min(1,dt*6); }
     else if(r.state==='drop'){
       r.len+=H*.85*dt; const p=tip(L);
+      if(!r.wet && p.y>L.waterY){ r.wet=true; SFX.plop(); drops(p.x,L.waterY,8,.5,1); }
       if(G.phase==='play') for(const f of G.fish){
         if(f.state!=='swim'||f.leave) continue;
         const top=f.laneY-(f.fh+f.lh)/2;
@@ -323,7 +364,7 @@ function update(dt){
       }
       if(p.y>H-S*3||p.x<0||p.x>W) r.state='reel';
     } else if(r.state==='reel'){
-      r.len-=H*(r.fish?.9:1.2)*dt; r.a*=1-Math.min(1,dt*1.6);
+      r.len-=H*(r.fish?.9:1.2)*dt; r.wet=false; G.clk=(G.clk||0)+dt; if(G.clk>.055){ G.clk=0; SFX.click(); } r.a*=1-Math.min(1,dt*1.6);
       if(r.len<=S*3){
         r.len=S*3; const f=r.fish;
         if(!f || f.gold || G.phase!=='play'){ r.fish=null; r.state='swing'; r.ph=Math.asin(Math.max(-1,Math.min(1,r.a/amp))); if(f) goldCaught(f,L); }
@@ -332,7 +373,8 @@ function update(dt){
     } else if(r.state==='hold'){ r.a*=1-Math.min(1,dt*3); }
     if(r.fish && r.fish.state==='hooked'){
       const p=tip(L), f=r.fish, wig=r.state==='hold'?1:.5;
-      f.x=p.x+Math.sin(G.t*9)*S*.4*wig; f.y=p.y+f.len*.5; f.rot=Math.PI/2+Math.sin(G.t*11)*.22*wig; f.flip=false;
+      f.x=p.x+Math.sin(G.t*9)*S*.4*wig; f.y=p.y+f.len*.5;
+      if(!f.out && f.y+f.len*.3<L.waterY){ f.out=true; SFX.splash(); drops(f.x,L.waterY,16,.8,1); } f.rot=Math.PI/2+Math.sin(G.t*11)*.22*wig; f.flip=false;
     }
   }
   if(G.phase==='suspense'){
@@ -378,22 +420,22 @@ function slapUpdate(f,dt,L){
   const a=f.an, t0=a.t; a.t+=dt; const t=a.t, S=L.S;
   const cross=x=>t0<x && t>=x;
   const fx=L.head.x+L.headR*.6+f.len*.6, fy=L.head.y+L.headR*.15;
-  f.flip=true; f.strike=0;
+  f.flip=true; f.strike=0; f.bend=0;
   if(t<T_IN){
     const k=ease(t/T_IN);
     f.x=lerp(f.sx,fx+S*3,k); f.y=lerp(f.sy,fy,k)-Math.sin(k*Math.PI)*S*5; f.rot=lerp(-Math.PI/2,0,k);
   } else if(t<T_TAUNT){
-    if(cross(T_IN)){ f.taunt=true; SFX.slide(); funnyPop('แบร่~ 😜',0); }
+    if(cross(T_IN)){ f.taunt=true; SFX.slide(); funnyPop('แบร่~',0); }
     f.x=fx+S*3+Math.sin(t*18)*S*.8; f.y=fy+Math.sin(t*9)*S*.6; f.rot=Math.sin(t*14)*.25;
   } else if(t<T_COMBO){
     f.taunt=false;
     const u=t-T_TAUNT, n=Math.floor(u/COMBO), p=(u%COMBO)/COMBO;
     for(let i=0;i<4;i++) if(cross(T_TAUNT+COMBO*(i+1)-.001)) comboHit(i,L);
     const sw=Math.sin(p*Math.PI), sgn=n%2?-1:1;
-    f.strike=p>.5?1-p:0; f.x=fx+sw*S*2; f.y=fy; f.rot=sw*1.1*sgn;
+    f.strike=p>.5?1-p:0; f.x=fx+sw*S*2; f.y=fy; f.rot=sw*1.1*sgn; f.bend=-sw*.55*sgn;
     if(cross(T_TAUNT+COMBO*n+COMBO*.4)) SFX.whoosh();
   } else if(t<T_WIND){
-    if(cross(T_COMBO)){ SFX.windup(); funnyPop('ท่าไม้ตาย!! 🌀',0); }
+    if(cross(T_COMBO)){ SFX.windup(); funnyPop('ท่าไม้ตาย!!',0); }
     const k=(t-T_COMBO)/(T_WIND-T_COMBO);
     f.x=fx+S*9*ease(Math.min(1,k*2)); f.y=fy-S*3*Math.sin(k*Math.PI); f.rot=-k*Math.PI*4;
   } else if(t<T_HIT){
@@ -404,28 +446,30 @@ function slapUpdate(f,dt,L){
     f.shades=true;
     const k=(t-T_HIT)/(T_BYE-T_HIT);
     f.x=fx+S*4+k*S*4; f.y=fy-S*4*Math.sin(Math.min(1,k*2)*Math.PI/2)+Math.sin(t*10)*S*.4; f.rot=Math.sin(t*8)*.2;
-    if(cross(T_HIT+.35)) funnyPop('บ๊ายบาย~ 😎',1);
+    if(cross(T_HIT+.35)) funnyPop('บ๊ายบาย~',1);
   } else {
     f.state='sink'; f.vx=S*10; f.vy=-S*14; f.rot=0; endSlap();
   }
 }
 function funnyPop(text,big){
   const L=layout(); G.pops=G.pops.filter(p=>!p.slap);
-  pop(L.head.x+L.S*9,L.waterY+L.S*6,text,big?'#ff3b48':'#ffe066',fontPx()*(1.7+big*.5),true);
+  pop(L.head.x-L.S*9,L.head.y-L.S*3,text,big?'#ff3b48':'#ffe066',fontPx()*(.95+big*.3),true);
 }
+function drops(x,y,n,k,up){ for(let i=0;i<n;i++){ const a=up?-Math.PI*(.15+Math.random()*.7):Math.PI*(.55+Math.random()*1.0), sp=(150+Math.random()*300)*k;
+  G.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,life:.45+Math.random()*.4,c:'rgba(215,242,255,.95)',r:1.5+Math.random()*2.2,drop:true}); } }
+function impactFX(L,k){ const r=L.headR, x=L.head.x+r*.95, y=L.head.y+r*.25; G.rings.push({x,y,t:0,k}); drops(x,y,Math.round(18*k),k); }
 function comboHit(i,L){
   if(i===0){ G.lives--; hud(); }
-  SFX.slapS(); G.shake=.22; G.hit=.4; G.jdir=i%2?1:-1; G.cheek=1; G.swell=Math.min(1,G.swell+.25);
-  burst(L.head.x+L.headR*.7,L.head.y,['#fff','#ffe066','#ff5a64'],14,240);
+  SFX.slapS(); impactFX(L,.7); G.squash=1; G.freeze=.06; G.shake=.22; G.hit=.4; G.jdir=i%2?1:-1; G.cheek=1; G.swell=Math.min(1,G.swell+.25);
   funnyPop(['เพียะ!','เพียะ!!','ป้าบ!','ป้าบ!!'][i],0);
 }
 function megaHit(L){
-  SFX.slap(); SFX.boing(); G.shake=.7; G.hit=1.1; G.jdir=-1; G.swell=1.4; G.spinT=.9; G.dizzy=4.5; G.cheek=1;
+  SFX.slap(); setTimeout(SFX.boing,120); say('โอ๊ยยย!'); impactFX(L,1.5); G.squash=1; G.freeze=.14; G.shake=.7; G.hit=1.1; G.jdir=-1; G.swell=1.4; G.spinT=.9; G.dizzy=4.5; G.cheek=1;
   const r=L.headR;
   G.hatOff={x:L.head.x,y:L.head.y-r,vx:-L.S*22,vy:-L.S*55,rot:0,vr:-9,float:false};
   G.tooth={x:L.head.x+r*.6,y:L.head.y+r*.5,vx:-L.S*14,vy:-L.S*40,rot:0};
-  burst(L.head.x+r*.7,L.head.y,['#fff','#ffe066','#ff5a64','#9fd3f5','#ffcd4b'],50,420);
-  funnyPop('ฟาดดดด!!! 💥',1);
+  burst(L.head.x+r*.7,L.head.y,['#ffe066','#fff'],12,300);
+  funnyPop('ฟาดดดด!!!',1);
 }
 function endSlap(){
   SFX.sad();
@@ -468,6 +512,9 @@ $('bAgain').onclick=startGame;
 $('bBoard1').onclick=$('bBoard2').onclick=board;
 $('bBack').onclick=toMenu;
 $('bClear').onclick=()=>{ if(confirm('ล้างประวัติคะแนนทุกรอบ?')){ scores=[]; saveScores(); board(); } };
+function muteLabel(){ $('mute').textContent=MUTED?'🔇':'🔊'; }
+muteLabel();
+$('mute').onclick=()=>{ MUTED=!MUTED; try{ localStorage.setItem('dhammaFish.mute',MUTED?'1':'0'); }catch(e){} if(MASTER) MASTER.gain.value=MUTED?0:1; if(MUTED) try{speechSynthesis.cancel()}catch(e){} muteLabel(); };
 $('quit').onclick=()=>{ if(confirm('จบรอบนี้และบันทึกคะแนน?')) gameOver('ครูสั่งจบ'); };
 
 // ---------- วาด ----------
@@ -480,7 +527,7 @@ function drawFishShape(f){
   if(f.gold){ ctx.shadowColor='#ffe066'; ctx.shadowBlur=len*.25+Math.sin(G.t*8)*len*.08; }
   const finG=ctx.createLinearGradient(0,-h,0,h); finG.addColorStop(0,c.fin); finG.addColorStop(1,c.mid);
   // หาง
-  ctx.save(); ctx.translate(len*.4,0); ctx.rotate(Math.sin(f.wob)*.35);
+  ctx.save(); ctx.translate(len*.4,0); ctx.rotate(Math.sin(f.wob)*.35+(f.bend||0));
   ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(len*.16,-h*.2,len*.3,-h*.7); ctx.quadraticCurveTo(len*.2,0,len*.3,h*.7); ctx.quadraticCurveTo(len*.16,h*.2,0,0);
   ctx.fillStyle=finG; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1; ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,.25)'; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(len*.03,0); ctx.lineTo(len*.27,h*.28*i); ctx.stroke(); }
@@ -545,6 +592,11 @@ function drawLabel(f,cx,ty){
   ctx.restore();
 }
 function drawFish(f){
+  if(f.state==='slap' && f.trail && f.trail.length){
+    const keep={x:f.x,y:f.y,rot:f.rot,alpha:f.alpha};
+    f.trail.slice(1).forEach((g,i)=>{ Object.assign(f,g,{alpha:.22-i*.06}); drawFishShape(f); });
+    Object.assign(f,keep);
+  }
   drawFishShape(f);
   if(!f.lines.length) return;
   if(f.state==='swim'){
@@ -579,16 +631,29 @@ function drawMan(L){
   const spin = G.spinT>0 ? ease(1-G.spinT/.9)*Math.PI*4 : 0;
   const wob = G.dizzy>0 ? Math.sin(G.t*5)*.25 : 0;
   ctx.save(); ctx.translate(L.head.x+jerk,L.head.y); ctx.rotate(jerk/S*.12+spin+wob);
+  const sq=G.squash*Math.cos((1-G.squash)*18); ctx.scale(1-.16*sq,1+.12*sq);
   ctx.fillStyle='#d99a6c'; ctx.fillRect(-r*.35,r*.6,r*.7,r*.8);
-  const hg=ctx.createRadialGradient(r*.3,-r*.2,r*.2,0,0,r*1.1); hg.addColorStop(0,'#f8d2ac'); hg.addColorStop(1,'#d4935f');
-  ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill();
-  if(G.swell>0){ // แก้มบวมปูดออกนอกหน้า
-    const sw=G.swell, cr=r*(.35+.55*sw);
-    const cg=ctx.createRadialGradient(r*.6+cr*.2,r*.25-cr*.3,cr*.1,r*.6,r*.3,cr);
-    cg.addColorStop(0,'#ffb0a0'); cg.addColorStop(.6,'#f06060'); cg.addColorStop(1,'#c83a3a');
-    ctx.fillStyle=cg; ctx.beginPath(); ctx.ellipse(r*.55+cr*.35,r*.3,cr,cr*.85,0,0,7); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.beginPath(); ctx.ellipse(r*.55+cr*.5,r*.3-cr*.4,cr*.25,cr*.14,-.4,0,7); ctx.fill();
-  } else if(G.cheek>0){ ctx.fillStyle=`rgba(230,40,50,${.65*G.cheek})`; ctx.beginPath(); ctx.ellipse(r*.5,r*.3,r*.38,r*.26,-.3,0,7); ctx.fill(); }
+  const sw=Math.min(1.4,G.swell), sw1=Math.min(1,sw), cr=r*(.22+.42*sw), kx=r*.5+cr*.45, ky=r*.35;
+  const hg=ctx.createRadialGradient(r*.3,-r*.25,r*.15,r*.2,r*.1,r*1.3); hg.addColorStop(0,'#f8d4b0'); hg.addColorStop(.7,'#e2a874'); hg.addColorStop(1,'#c98652');
+  ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(0,0,r,0,7);
+  if(sw>.02){ ctx.moveTo(kx+cr,ky); ctx.ellipse(kx,ky,cr,cr*.88,-.2,0,7); }
+  ctx.fill();
+  if(sw>.02){ // แก้มบวม: ช้ำแดงอมม่วง เงาใต้ก้อนบวม ผิวตึงมันวาว
+    let g=ctx.createRadialGradient(kx,ky,0,kx,ky,cr*1.05);
+    g.addColorStop(0,'rgba(185,25,45,'+(.6*sw1)+')'); g.addColorStop(.55,'rgba(135,40,95,'+(.38*sw1)+')'); g.addColorStop(1,'rgba(135,40,95,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(kx,ky,cr*1.05,cr*.95,-.2,0,7); ctx.fill();
+    g=ctx.createLinearGradient(0,ky,0,ky+cr); g.addColorStop(0,'rgba(70,15,15,0)'); g.addColorStop(1,'rgba(70,15,15,'+(.35*sw1)+')');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(kx,ky,cr,cr*.88,-.2,0,Math.PI); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,'+(.5*sw1)+')'; ctx.beginPath(); ctx.ellipse(kx+cr*.2,ky-cr*.48,cr*.34,cr*.12,-.45,0,7); ctx.fill();
+  }
+  if(G.cheek>0){ // รอยหางปลาเป็นริ้วแดง
+    ctx.strokeStyle='rgba(200,20,35,'+(.55*G.cheek)+')'; ctx.lineWidth=r*.1; ctx.lineCap='round';
+    for(let i=0;i<4;i++){ const an=-.45+i*.3, r0=r*.3, r1=r*.85+cr*.5; ctx.beginPath(); ctx.moveTo(r*.1+Math.cos(an)*r0,r*.15+Math.sin(an)*r0); ctx.lineTo(r*.1+Math.cos(an)*r1,r*.15+Math.sin(an)*r1); ctx.stroke(); }
+  }
+  // จมูก คิ้ว
+  ctx.fillStyle='#d48e5a'; ctx.beginPath(); ctx.ellipse(r*.93,r*.08,r*.15,r*.12,0,0,7); ctx.fill();
+  ctx.strokeStyle='#2a1a10'; ctx.lineWidth=Math.max(2,r*.09); ctx.lineCap='round';
+  const brow=G.hit>0?-r*.12:0; ctx.beginPath(); ctx.moveTo(r*.28,-r*.42+brow); ctx.quadraticCurveTo(r*.5,-r*.52+brow,r*.72,-r*.4+brow*.3); ctx.stroke();
   ctx.fillStyle='#2a1a10'; ctx.beginPath(); ctx.arc(-r*.1,-r*.1,r*.98,Math.PI*.75,Math.PI*1.6); ctx.lineTo(-r*.2,-r*.3); ctx.fill();
   ctx.fillStyle='#d4935f'; ctx.beginPath(); ctx.ellipse(-r*.2,r*.05,r*.18,r*.26,0,0,7); ctx.fill();
   ctx.strokeStyle='#1a1010'; ctx.fillStyle='#1a1010'; ctx.lineWidth=Math.max(2,r*.1); ctx.lineCap='round';
@@ -602,7 +667,8 @@ function drawMan(L){
     ctx.beginPath(); ctx.moveTo(ex-s,ey-s); ctx.lineTo(ex+s,ey+s); ctx.moveTo(ex+s,ey-s); ctx.lineTo(ex-s,ey+s); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(r*.62,r*.5,r*.15,r*.22,0,0,7); ctx.fill();
   } else {
-    ctx.beginPath(); ctx.arc(r*.5,-r*.15,r*.12,0,7); ctx.fill();
+    if(G.swell>.45){ ctx.beginPath(); ctx.moveTo(r*.38,-r*.12); ctx.quadraticCurveTo(r*.5,-r*.2,r*.62,-r*.12); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(r*.5,-r*.15,r*.12,0,7); ctx.fill(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(r*.54,-r*.19,r*.04,0,7); ctx.fill(); ctx.fillStyle='#1a1010'; }
     ctx.beginPath(); ctx.moveTo(r*.45,r*.48); ctx.quadraticCurveTo(r*.65,r*.58,r*.8,r*.45); ctx.stroke();
   }
   if(!G.hatOff) drawHat(r);
@@ -646,7 +712,7 @@ function waveY(x,L){ return L.waterY+Math.sin(x*.02+G.t*1.5)*L.S*.35+Math.sin(x*
 function drawScene(L){
   const S=L.S;
   let g=ctx.createLinearGradient(0,0,0,L.waterY); g.addColorStop(0,'#5fb0e8'); g.addColorStop(.7,'#bfe2f7'); g.addColorStop(1,'#ffe7c2');
-  ctx.fillStyle=g; ctx.fillRect(-30,-30,W+60,L.waterY+30);
+  ctx.fillStyle=g; ctx.fillRect(-W,-H,W*3,L.waterY+H);
   const sx=W*.84, sy=L.waterY*.5;
   g=ctx.createRadialGradient(sx,sy,0,sx,sy,S*18); g.addColorStop(0,'rgba(255,250,220,1)'); g.addColorStop(.15,'rgba(255,240,180,.9)'); g.addColorStop(1,'rgba(255,240,180,0)');
   ctx.fillStyle=g; ctx.fillRect(sx-S*18,sy-S*18,S*36,S*36);
@@ -718,9 +784,13 @@ function drawSuspense(L){
 
 function draw(){
   const L=layout();
+  ctx.fillStyle='#0a2f52'; ctx.fillRect(0,0,W,H);
   ctx.save();
   if(G.shake>0){ const m=L.S*2.5*G.shake/.32; ctx.translate((Math.random()-.5)*m,(Math.random()-.5)*m); }
+  const c=G.cam; if(c.z>1.001){ const k=(c.z-1)/1.1; ctx.translate(lerp(c.x,W*.42,k),lerp(c.y,H*.5,k)); ctx.scale(c.z,c.z); ctx.translate(-c.x,-c.y); }
   drawScene(L);
+  ctx.save(); ctx.beginPath(); ctx.rect(-W,L.waterY+L.S*.3,W*3,H); ctx.clip();
+  ctx.translate(0,L.waterY+L.S*.6); ctx.scale(1,-.7); ctx.translate(0,-(L.waterY+L.S*.6)); ctx.globalAlpha=.16; ctx.filter='blur(1.5px)'; drawBoat(L); drawMan(L); ctx.restore();
   G.fish.filter(f=>f.state==='swim'||f.state==='sink').forEach(drawFish);
   drawMan(L); drawBoat(L); drawFlyers(L);
   const r=G.rod;
@@ -739,7 +809,12 @@ function draw(){
   }
   G.fish.filter(f=>f.state==='hooked'||f.state==='caught'||f.state==='slap').forEach(drawFish);
   if(G.phase==='suspense') drawSuspense(L);
-  for(const p of G.parts){ ctx.fillStyle=p.c; ctx.globalAlpha=1-p.t/p.life; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill(); }
+  for(const p of G.parts){ ctx.globalAlpha=1-p.t/p.life;
+    if(p.drop){ ctx.strokeStyle=p.c; ctx.lineWidth=p.r; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*.03,p.y-p.vy*.03); ctx.stroke(); }
+    else { ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill(); } }
+  for(const g of G.rings){ const k=g.t/.3, rx=L.headR*(.4+k*2.2*g.k), ry=L.headR*(.3+k*1.6*g.k); ctx.globalAlpha=1-k; ctx.strokeStyle='#fff'; ctx.lineWidth=3*(1-k)+1;
+    ctx.beginPath(); ctx.ellipse(g.x,g.y,rx,ry,0,Math.PI*.55,Math.PI*1.45); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(g.x,g.y,rx,ry,0,-Math.PI*.35,Math.PI*.35); ctx.stroke(); }
   ctx.globalAlpha=1;
   for(const p of G.pops){
     ctx.font=`800 ${p.size}px ${FONT}`; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -750,7 +825,7 @@ function draw(){
 }
 
 let last=performance.now();
-function loop(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(innerWidth!==W||innerHeight!==H) resize(); update(dt); draw(); requestAnimationFrame(loop); }
+function loop(now){ const dt=Math.min(.1,(now-last)/1000); last=now; if(innerWidth!==W||innerHeight!==H) resize(); let d=dt; if(G.freeze>0){ G.freeze-=dt; d=0; } update(d); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
 </body>
