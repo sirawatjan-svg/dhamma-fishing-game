@@ -35,7 +35,8 @@ tr.top td{background:#ffe9a8;font-weight:700}
 #introQ{font-size:clamp(22px,4.2vw,46px);font-weight:700;line-height:1.4;margin:10px 0}
 #introN{font-size:clamp(18px,2.6vw,26px);color:#1f5e9c;font-weight:700}
 #count{font-size:clamp(16px,2.2vw,22px);color:#5d6b8c}
-#oGroup{font-size:clamp(24px,4.5vw,44px);font-weight:800;color:#1f5e9c}
+#oRound{color:#1f5e9c}
+.big b.t{font-size:clamp(34px,7vw,72px);padding:clamp(14px,3vw,34px) 0}
 .big{margin:10px auto;padding:10px 24px;display:inline-block;background:#3b2a20;color:#fff;border-radius:16px;box-shadow:inset 0 0 0 4px var(--gold)}
 .big span{display:block;font-size:clamp(16px,2.4vw,24px);color:var(--gold);font-weight:700}
 .big b{display:block;font-size:clamp(64px,14vw,150px);line-height:1.05;color:#fff;text-shadow:0 4px 0 #000}
@@ -50,7 +51,7 @@ tr.top td{background:#ffe9a8;font-weight:700}
 <div id="hud">
   <div class="bar">
     <div><span id="hGroup"></span><span id="lives"></span></div>
-    <div><span>คะแนน <b id="hScore">0</b></span><span id="timer">20</span><button id="quit">จบกลุ่มนี้</button></div>
+    <div><span>คะแนน <b id="hScore">0</b></span><span id="timer">20</span><button id="quit">จบรอบนี้</button></div>
   </div>
   <div id="qbox"></div>
 </div>
@@ -62,14 +63,13 @@ tr.top td{background:#ffe9a8;font-weight:700}
   <div class="how">
     🎣 เบ็ดแกว่งไปมา กด <b>เว้นวรรค</b> / คลิก / แตะจอ เพื่อหย่อนเบ็ด<br>
     ⏳ ตกได้แล้วต้องลุ้น! รอเสียงนับถอยหลังว่าถูกหรือผิด<br>
-    ✅ ถูก ได้คะแนน (ตอบเร็วยิ่งได้มาก)<br>
+    ✅ ถูก ได้ข้อละ ๑ คะแนน<br>
     🐟 ผิด ปลาตบหน้า เสีย ๑ ชีวิต แล้วไปข้อถัดไป<br>
     💀 ผิดครบ ๓ ครั้ง หรือหมดเวลาข้อละ ๒๐ วินาที = จบเกม<br>
     ✨ ปลาทองโบนัส เกี่ยวได้ ชีวิตคืน ๑ (มีครั้งเดียว)
   </div><br>
-  <input id="gName" maxlength="24" placeholder="ชื่อกลุ่ม">
-  <br><button class="btn" id="bStart">เริ่มตกปลา</button>
-  <button class="btn alt" id="bBoard1">ตารางคะแนน</button>
+  <button class="btn" id="bStart">เริ่มตกปลา</button>
+  <button class="btn alt" id="bBoard1">คะแนนแต่ละรอบ</button>
 </div></section>
 
 <section class="screen" id="sIntro"><div class="card">
@@ -80,17 +80,18 @@ tr.top td{background:#ffe9a8;font-weight:700}
 
 <section class="screen" id="sOver"><div class="card">
   <h2 id="oTitle"></h2>
-  <div id="oGroup"></div>
   <div class="big"><span>คะแนนที่ได้</span><b id="oScore">0</b></div>
+  <div class="big"><span>เวลาที่เล่น</span><b id="oTime" class="t"></b></div>
   <p id="oInfo"></p>
-  <button class="btn" id="bBoard2">ดูตารางคะแนนรวม</button>
+  <button class="btn" id="bAgain">เล่นอีกรอบ</button>
+  <button class="btn alt" id="bBoard2">คะแนนแต่ละรอบ</button>
 </div></section>
 
 <section class="screen" id="sBoard"><div class="card">
-  <h2>🏆 ตารางคะแนนรวม</h2>
+  <h2>📋 คะแนนแต่ละรอบ</h2>
   <div id="tbl"></div>
   <button class="btn" id="bBack">หน้าแรก</button>
-  <br><button class="btn small" id="bClear">ล้างคะแนนทั้งหมด</button>
+  <br><button class="btn small" id="bClear">ล้างประวัติทั้งหมด</button>
 </div></section>
 
 <script>
@@ -132,13 +133,19 @@ const SFX = {
   whoosh:()=>noise(.18,.5,900),
   slap:()=>{noise(.14,1.6,2600);tone(150,.14,'sine',.35,60);},
   splash:()=>noise(.5,.6,700),
+  slapS:()=>{noise(.1,1.3,3000);tone(220,.08,'sine',.2,90);},
+  slide:()=>tone(300,.45,'sine',.12,1500),
+  windup:()=>tone(140,.7,'sawtooth',.06,800),
+  boing:()=>{tone(520,.7,'sine',.22,70);tone(260,.7,'triangle',.08,40);},
+  tweet:()=>{tone(2300,.06,'sine',.04,2900);setTimeout(()=>tone(2500,.06,'sine',.04,3100),90);},
+  sad:()=>[[392,.35],[370,.35],[349,.35],[330,1.0]].reduce((t,[f,d])=>{setTimeout(()=>{tone(f,d,'sawtooth',.06,f*.97);tone(f,d,'triangle',.08);},t*1000);return t+d;},0),
   gold:()=>[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.12,'triangle',.08),i*70)),
   tick:()=>tone(1000,.04,'square',.04),
   over:()=>[392,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,.25,'triangle',.08),i*180)),
 };
 
 // ---------- ข้อมูลคะแนน ----------
-const KEY='dhammaFish.scores.v1';
+const KEY='dhammaFish.rounds.v1';
 let scores = [];
 try{ scores = JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ scores=[]; }
 function saveScores(){ try{ localStorage.setItem(KEY, JSON.stringify(scores)); }catch(e){} }
@@ -179,11 +186,11 @@ const fishLen = () => Math.max(55, Math.min(150, Math.min(W, H*1.3)*.115));
 function fontPx(){ return Math.max(14,Math.min(26,Math.min(W,H*1.4)*.028)); }
 
 // ---------- สถานะเกม ----------
-const G = {phase:'menu', fish:[], parts:[], pops:[], t:0, shake:0, hit:0, cheek:0, run:0};
+const G = {phase:'menu', fish:[], parts:[], pops:[], t:0, shake:0, hit:0, cheek:0, run:0, jdir:1, swell:0, dizzy:0, spinT:0, hatOff:null, tooth:null};
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id)); }
 function msg(html, cls){ const m=$('msg'); m.className=cls||''; m.innerHTML=html; m.style.display=html?'block':'none'; }
 function hud(){
-  $('hGroup').textContent='👥 '+G.group;
+  $('hGroup').textContent='🎣 รอบที่ '+TH(G.round);
   $('hScore').textContent=TH(G.score);
   $('lives').textContent='❤'.repeat(Math.max(0,G.lives))+'♡'.repeat(Math.max(0,LIVES-G.lives));
 }
@@ -191,14 +198,14 @@ function later(fn,ms){ const id=G.run; setTimeout(()=>{ if(G.run===id && G.phase
 function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function startGame(){
-  G.group = ($('gName').value.trim()) || ('กลุ่ม '+TH(scores.length+1));
+  G.round = scores.length+1; G.t0 = Date.now();
   Object.assign(G,{run:G.run+1,score:0,lives:LIVES,correct:0,qn:0,goldUsed:false,goldAfter:1+Math.floor(Math.random()*3),cheek:0});
   hud(); startQuestion();
 }
 
 let introTimer=null;
 function startQuestion(){
-  G.qn++; G.q = nextQuestion(); G.phase='intro'; G.fish=[]; G.rod=null; msg('');
+  G.qn++; G.q = nextQuestion(); Object.assign(G,{swell:0,dizzy:0,spinT:0,hatOff:null,tooth:null,cheek:0,hit:0}); G.phase='intro'; G.fish=[]; G.rod=null; msg('');
   $('hud').style.display='none';
   $('introN').textContent = 'ข้อที่ '+TH(G.qn)+' · '+G.q.category;
   $('introQ').textContent = G.q.q;
@@ -269,7 +276,14 @@ function swimY(f){ return f.laneY-(f.fh+f.lh)/2+f.fh/2; }
 
 // ---------- อัปเดต ----------
 function update(dt){
-  G.t+=dt; G.shake=Math.max(0,G.shake-dt); G.hit=Math.max(0,G.hit-dt); G.cheek=Math.max(0,G.cheek-dt*.2);
+  G.t+=dt; G.shake=Math.max(0,G.shake-dt); G.hit=Math.max(0,G.hit-dt); G.cheek=Math.max(0,G.cheek-dt*.08);
+  G.spinT=Math.max(0,G.spinT-dt); G.swell=Math.max(0,G.swell-dt*.05);
+  if(G.dizzy>0){ G.dizzy-=dt; if(Math.floor(G.dizzy*1.5)!==Math.floor((G.dizzy+dt)*1.5)) SFX.tweet(); }
+  { const L0=layout(), g=L0.S*90;
+    for(const o of [G.hatOff,G.tooth]) if(o && !o.float){ o.vy+=g*dt; o.x+=o.vx*dt; o.y+=o.vy*dt; o.rot+=(o.vr||14)*dt;
+      if(o.y>L0.waterY){ o.float=true; SFX.splash(); burst(o.x,L0.waterY,['#d8f0ff','#fff'],12,180); } }
+    if(G.hatOff&&G.hatOff.float){ G.hatOff.y=L0.waterY-L0.S*.6+Math.sin(G.t*2)*L0.S*.3; G.hatOff.x-=L0.S*.6*dt; G.hatOff.rot*=.95; }
+    if(G.tooth&&G.tooth.float) G.tooth=null; }
   const L=layout(), S=L.S;
   for(const f of G.fish){
     f.wob+=dt*(f.state==='swim'?5:14);
@@ -344,7 +358,7 @@ function startSuspense(f){
 function reveal(f,L){
   G.phase='resolve'; G.rod.fish=null; G.rod.state='swing'; G.rod.ph=0;
   if(f.correct){
-    const pts = 100 + Math.ceil(G.time)*5;
+    const pts = 1;
     G.score+=pts; G.correct++; hud(); SFX.good();
     f.state='caught'; f.ct=0; f.sx=f.x; f.sy=f.y;
     burst(f.x,f.y,['#ffcd4b','#38b764','#fff','#3b8ee8','#e43b44'],50,320);
@@ -357,36 +371,67 @@ function reveal(f,L){
   }
 }
 
-// ปลาลอยไปข้างหน้าคน แล้วเอาหางตบหน้า ๓ ที
-const SLAP_IN=.45, SLAP_CYCLE=.42, SLAP_N=3;
+// ฉากตลก: ปลาลอยมาแลบลิ้นยั่ว → ตบรัว ๔ ที (แก้มบวมขึ้นเรื่อย ๆ) → ง้างหมุนตัวฟาดท่าไม้ตาย
+// (งอบปลิว ฟันหลุด หัวหมุน ตาลาย นกบินวน) → ปลาใส่แว่นดำโบกบายแล้วกระโดดลงน้ำ + เสียงทรอมโบนเศร้า
+const T_IN=.45, T_TAUNT=1.15, COMBO=.24, T_COMBO=T_TAUNT+COMBO*4, T_WIND=T_COMBO+.7, T_HIT=T_WIND+.1, T_BYE=T_HIT+1.0;
 function slapUpdate(f,dt,L){
-  const a=f.an; a.t+=dt;
+  const a=f.an, t0=a.t; a.t+=dt; const t=a.t, S=L.S;
+  const cross=x=>t0<x && t>=x;
   const fx=L.head.x+L.headR*.6+f.len*.6, fy=L.head.y+L.headR*.15;
-  f.flip=true;
-  if(a.t<SLAP_IN){
-    const k=ease(a.t/SLAP_IN);
-    f.x=lerp(f.sx,fx,k); f.y=lerp(f.sy,fy,k)-Math.sin(k*Math.PI)*L.S*5; f.rot=lerp(-Math.PI/2,0,k);
-    return;
+  f.flip=true; f.strike=0;
+  if(t<T_IN){
+    const k=ease(t/T_IN);
+    f.x=lerp(f.sx,fx+S*3,k); f.y=lerp(f.sy,fy,k)-Math.sin(k*Math.PI)*S*5; f.rot=lerp(-Math.PI/2,0,k);
+  } else if(t<T_TAUNT){
+    if(cross(T_IN)){ f.taunt=true; SFX.slide(); funnyPop('แบร่~ 😜',0); }
+    f.x=fx+S*3+Math.sin(t*18)*S*.8; f.y=fy+Math.sin(t*9)*S*.6; f.rot=Math.sin(t*14)*.25;
+  } else if(t<T_COMBO){
+    f.taunt=false;
+    const u=t-T_TAUNT, n=Math.floor(u/COMBO), p=(u%COMBO)/COMBO;
+    for(let i=0;i<4;i++) if(cross(T_TAUNT+COMBO*(i+1)-.001)) comboHit(i,L);
+    const sw=Math.sin(p*Math.PI), sgn=n%2?-1:1;
+    f.strike=p>.5?1-p:0; f.x=fx+sw*S*2; f.y=fy; f.rot=sw*1.1*sgn;
+    if(cross(T_TAUNT+COMBO*n+COMBO*.4)) SFX.whoosh();
+  } else if(t<T_WIND){
+    if(cross(T_COMBO)){ SFX.windup(); funnyPop('ท่าไม้ตาย!! 🌀',0); }
+    const k=(t-T_COMBO)/(T_WIND-T_COMBO);
+    f.x=fx+S*9*ease(Math.min(1,k*2)); f.y=fy-S*3*Math.sin(k*Math.PI); f.rot=-k*Math.PI*4;
+  } else if(t<T_HIT){
+    const k=(t-T_WIND)/(T_HIT-T_WIND);
+    f.x=lerp(fx+S*9,fx-S*.5,k); f.y=fy; f.rot=-Math.PI*4-k*.6; f.strike=1;
+  } else if(t<T_BYE){
+    if(cross(T_HIT)) megaHit(L);
+    f.shades=true;
+    const k=(t-T_HIT)/(T_BYE-T_HIT);
+    f.x=fx+S*4+k*S*4; f.y=fy-S*4*Math.sin(Math.min(1,k*2)*Math.PI/2)+Math.sin(t*10)*S*.4; f.rot=Math.sin(t*8)*.2;
+    if(cross(T_HIT+.35)) funnyPop('บ๊ายบาย~ 😎',1);
+  } else {
+    f.state='sink'; f.vx=S*10; f.vy=-S*14; f.rot=0; endSlap();
   }
-  const u=a.t-SLAP_IN, n=Math.floor(u/SLAP_CYCLE), p=(u%SLAP_CYCLE)/SLAP_CYCLE;
-  while(a.hits<Math.min(n,SLAP_N)) slapImpact(a.hits++, L);
-  if(n>=SLAP_N){ f.state='sink'; f.vx=L.S*8; f.vy=-L.S*10; endSlap(); return; }
-  const sw = p<.62 ? Math.sin(p/.62*Math.PI/2) : 1-(p-.62)/.38;
-  if(p>=.62 && a.wh<=n){ a.wh=n+1; SFX.whoosh(); }
-  f.strike = p>=.62 ? (p-.62)/.38 : 0;
-  f.x=fx+sw*L.S*2.5; f.y=fy+sw*L.S*.5; f.rot=sw*1.15;
 }
-function slapImpact(i,L){
+function funnyPop(text,big){
+  const L=layout(); G.pops=G.pops.filter(p=>!p.slap);
+  pop(L.head.x+L.S*9,L.waterY+L.S*6,text,big?'#ff3b48':'#ffe066',fontPx()*(1.7+big*.5),true);
+}
+function comboHit(i,L){
   if(i===0){ G.lives--; hud(); }
-  SFX.slap(); G.shake=.32; G.hit=.55; G.cheek=1;
-  const fx=L.head.x+L.headR*.7, fy=L.head.y;
-  burst(fx,fy,['#fff','#ffe066','#ff5a64','#9fd3f5'],26,300);
-  G.pops=G.pops.filter(p=>!p.slap); pop(L.head.x+L.S*9,L.waterY+L.S*6,['เพียะ!','ป้าบ!!','ฟาด!!!'][i]||'ฟาด!','#ff5a64',fontPx()*(1.8+i*.35),true);
+  SFX.slapS(); G.shake=.22; G.hit=.4; G.jdir=i%2?1:-1; G.cheek=1; G.swell=Math.min(1,G.swell+.25);
+  burst(L.head.x+L.headR*.7,L.head.y,['#fff','#ffe066','#ff5a64'],14,240);
+  funnyPop(['เพียะ!','เพียะ!!','ป้าบ!','ป้าบ!!'][i],0);
+}
+function megaHit(L){
+  SFX.slap(); SFX.boing(); G.shake=.7; G.hit=1.1; G.jdir=-1; G.swell=1.4; G.spinT=.9; G.dizzy=4.5; G.cheek=1;
+  const r=L.headR;
+  G.hatOff={x:L.head.x,y:L.head.y-r,vx:-L.S*22,vy:-L.S*55,rot:0,vr:-9,float:false};
+  G.tooth={x:L.head.x+r*.6,y:L.head.y+r*.5,vx:-L.S*14,vy:-L.S*40,rot:0};
+  burst(L.head.x+r*.7,L.head.y,['#fff','#ffe066','#ff5a64','#9fd3f5','#ffcd4b'],50,420);
+  funnyPop('ฟาดดดด!!! 💥',1);
 }
 function endSlap(){
+  SFX.sad();
   const ans = LETTERS[G.q.answer]+'. '+G.q.choices[G.q.answer];
   msg('❌ ผิด! คำตอบที่ถูกคือ '+esc(ans)+'<small>'+esc(G.q.explain||'')+'</small>','bad');
-  later(()=>{ if(G.lives<=0) gameOver('ผิดครบ ๓ ครั้ง'); else startQuestion(); }, 3400);
+  later(()=>{ if(G.lives<=0) gameOver('ผิดครบ ๓ ครั้ง'); else startQuestion(); }, 3600);
 }
 function timeout(){
   G.phase='resolve'; G.fish.forEach(f=>f.leave=true); if(G.rod){ G.rod.state='reel'; }
@@ -398,31 +443,32 @@ function timeout(){
 function gameOver(why){
   if(G.phase==='over'||G.phase==='menu') return;
   G.phase='over'; G.run++; msg(''); $('hud').style.display='none'; SFX.over(); clearInterval(introTimer);
-  const entry={name:G.group,score:G.score,correct:G.correct,at:Date.now()};
+  const secs=Math.round((Date.now()-G.t0)/1000);
+  const entry={round:G.round,score:G.score,secs,at:Date.now()};
   scores.push(entry); saveScores();
-  const rank=[...scores].sort((a,b)=>b.score-a.score||b.correct-a.correct).indexOf(entry)+1;
-  $('oTitle').textContent='จบเกม: '+why;
-  $('oGroup').textContent=G.group;
+  $('oTitle').textContent='จบรอบที่ '+TH(G.round)+' · '+why;
   $('oScore').textContent=TH(G.score);
-  $('oInfo').innerHTML=`ตอบถูก <b>${TH(G.correct)}</b> ข้อ · อันดับที่ <b>${TH(rank)}</b> จาก ${TH(scores.length)} กลุ่ม`;
+  $('oTime').textContent=dur(secs);
+  $('oInfo').innerHTML='ตอบถูก <b>'+TH(G.correct)+'</b> ข้อ (ข้อละ ๑ คะแนน)';
   show('sOver');
 }
+function dur(sec){ const m=Math.floor(sec/60), s=sec%60; return (m?TH(m)+' นาที ':'')+TH(s)+' วินาที'; }
+function when(t){ const d=new Date(t); return TH(d.getDate())+'/'+TH(d.getMonth()+1)+' '+TH(d.getHours())+':'+TH(String(d.getMinutes()).padStart(2,'0')); }
 function board(){
-  const rows=[...scores].sort((a,b)=>b.score-a.score||b.correct-a.correct);
-  $('tbl').innerHTML = rows.length ? '<table><tr><th>อันดับ</th><th>กลุ่ม</th><th>ถูก</th><th>คะแนน</th></tr>'+
-    rows.map((r,i)=>`<tr class="${i===0?'top':''}"><td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':TH(i+1)}</td><td>${esc(r.name)}</td><td>${TH(r.correct)}</td><td><b>${TH(r.score)}</b></td></tr>`).join('')+'</table>'
-    : '<p>ยังไม่มีกลุ่มเล่น</p>';
+  const rows=[...scores].reverse();
+  $('tbl').innerHTML = rows.length ? '<table><tr><th>รอบที่</th><th>เล่นเมื่อ</th><th>คะแนน</th><th>เวลาที่เล่น</th></tr>'+
+    rows.map((r,i)=>'<tr class="'+(i===0?'top':'')+'"><td>'+TH(r.round)+'</td><td>'+when(r.at)+'</td><td><b>'+TH(r.score)+'</b></td><td>'+dur(r.secs)+'</td></tr>').join('')+'</table>'
+    : '<p>ยังไม่มีรอบที่เล่น</p>';
   show('sBoard');
 }
-function toMenu(){ G.phase='menu'; G.fish=[]; G.rod=null; $('gName').value=''; $('gName').placeholder='กลุ่ม '+TH(scores.length+1); show('sMenu'); }
+function toMenu(){ G.phase='menu'; G.fish=[]; G.rod=null; show('sMenu'); }
 
 $('bStart').onclick=startGame;
-$('gName').addEventListener('keydown',e=>{ if(e.key==='Enter') startGame(); });
+$('bAgain').onclick=startGame;
 $('bBoard1').onclick=$('bBoard2').onclick=board;
 $('bBack').onclick=toMenu;
-$('bClear').onclick=()=>{ if(confirm('ล้างคะแนนของทุกกลุ่ม?')){ scores=[]; saveScores(); board(); } };
-$('quit').onclick=()=>{ if(confirm('จบเกมของกลุ่มนี้และบันทึกคะแนน?')) gameOver('ครูสั่งจบ'); };
-$('gName').placeholder='กลุ่ม '+TH(scores.length+1);
+$('bClear').onclick=()=>{ if(confirm('ล้างประวัติคะแนนทุกรอบ?')){ scores=[]; saveScores(); board(); } };
+$('quit').onclick=()=>{ if(confirm('จบรอบนี้และบันทึกคะแนน?')) gameOver('ครูสั่งจบ'); };
 
 // ---------- วาด ----------
 function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -462,11 +508,22 @@ function drawFishShape(f){
   // แก้ม เหงือก ครีบอก
   ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.arc(-len*.2,0,h*.42,Math.PI*.62,Math.PI*1.38,false); ctx.stroke();
   ctx.fillStyle=c.fin+'b0'; ctx.beginPath(); ctx.moveTo(-len*.14,h*.12); ctx.quadraticCurveTo(-len*.02,h*.25+Math.sin(f.wob)*h*.1,-len*.02,h*.4); ctx.quadraticCurveTo(-len*.1,h*.3,-len*.14,h*.12); ctx.fill();
-  // ตา
+  // ตา (ยั่ว = ขยิบตา แลบลิ้น / ชนะ = ใส่แว่นดำ)
   const ex=-len*.34, ey=-h*.08, er=h*.14;
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex,ey,er,0,7); ctx.fill();
-  ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(ex-er*.15,ey,er*.62,0,7); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex-er*.35,ey-er*.3,er*.22,0,7); ctx.fill();
+  if(f.taunt){
+    ctx.strokeStyle='#111'; ctx.lineWidth=Math.max(2,len*.02); ctx.beginPath(); ctx.moveTo(ex-er,ey); ctx.quadraticCurveTo(ex,ey+er*.8,ex+er,ey); ctx.stroke();
+    ctx.fillStyle='#ff6f8a'; ctx.beginPath(); ctx.ellipse(-len*.53,h*.2,len*.06,h*.16+Math.sin(G.t*20)*h*.04,.5,0,7); ctx.fill();
+    ctx.strokeStyle='#c2405a'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(-len*.51,h*.1); ctx.lineTo(-len*.55,h*.28); ctx.stroke();
+  } else {
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex,ey,er,0,7); ctx.fill();
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(ex-er*.15,ey,er*.62,0,7); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex-er*.35,ey-er*.3,er*.22,0,7); ctx.fill();
+  }
+  if(f.shades){
+    ctx.fillStyle='#111'; rrect(ex-er*1.7,ey-er*.9,er*3.2,er*1.7,er*.5); ctx.fill();
+    ctx.strokeStyle='#111'; ctx.lineWidth=Math.max(2,len*.02); ctx.beginPath(); ctx.moveTo(ex+er*1.4,ey-er*.4); ctx.lineTo(ex+er*3.5,ey-er*.9); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fillRect(ex-er*1.2,ey-er*.6,er*.9,er*.25);
+  }
   // ปาก
   ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=Math.max(1,len*.012); ctx.beginPath(); ctx.moveTo(-len*.5,h*.06); ctx.quadraticCurveTo(-len*.45,h*.14,-len*.4,h*.12); ctx.stroke();
   ctx.restore();
@@ -503,7 +560,7 @@ function drawFish(f){
 
 function drawMan(L){
   const S=L.S, x=L.manX, sy=L.seatY, r=L.headR;
-  const jerk = G.hit>0 ? -Math.sin((.55-G.hit)*26)*G.hit*S*2.4 : 0;
+  const jerk = G.hit>0 ? G.jdir*Math.sin(G.hit*24)*Math.min(1,G.hit*2)*S*2.6 : 0;
   // ลำตัว
   const sg=ctx.createLinearGradient(x-3*S,0,x+3*S,0); sg.addColorStop(0,'#2a5585'); sg.addColorStop(.5,'#3f78b5'); sg.addColorStop(1,'#2a5585');
   ctx.fillStyle=sg; rrect(x-2.8*S,sy-8.6*S,5.6*S,8.6*S,1.6*S); ctx.fill();
@@ -518,33 +575,57 @@ function drawMan(L){
   const hx=lerp(bx,L.tipX,.27), hy=lerp(by,L.tipY,.27);
   ctx.strokeStyle='#3f78b5'; ctx.lineWidth=S*1.5; ctx.beginPath(); ctx.moveTo(x+1.2*S,sy-7.2*S); ctx.quadraticCurveTo(x+3*S,sy-4*S,hx,hy); ctx.stroke();
   ctx.fillStyle='#e8b088'; ctx.beginPath(); ctx.arc(hx,hy,S*.85,0,7); ctx.fill();
-  // หัว
-  ctx.save(); ctx.translate(L.head.x+jerk,L.head.y); ctx.rotate(jerk/S*.09);
+  // หัว (แก้มบวม หัวหมุน ตาลาย ฟันหลอ เมื่อโดนตบ)
+  const spin = G.spinT>0 ? ease(1-G.spinT/.9)*Math.PI*4 : 0;
+  const wob = G.dizzy>0 ? Math.sin(G.t*5)*.25 : 0;
+  ctx.save(); ctx.translate(L.head.x+jerk,L.head.y); ctx.rotate(jerk/S*.12+spin+wob);
   ctx.fillStyle='#d99a6c'; ctx.fillRect(-r*.35,r*.6,r*.7,r*.8);
   const hg=ctx.createRadialGradient(r*.3,-r*.2,r*.2,0,0,r*1.1); hg.addColorStop(0,'#f8d2ac'); hg.addColorStop(1,'#d4935f');
   ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill();
+  if(G.swell>0){ // แก้มบวมปูดออกนอกหน้า
+    const sw=G.swell, cr=r*(.35+.55*sw);
+    const cg=ctx.createRadialGradient(r*.6+cr*.2,r*.25-cr*.3,cr*.1,r*.6,r*.3,cr);
+    cg.addColorStop(0,'#ffb0a0'); cg.addColorStop(.6,'#f06060'); cg.addColorStop(1,'#c83a3a');
+    ctx.fillStyle=cg; ctx.beginPath(); ctx.ellipse(r*.55+cr*.35,r*.3,cr,cr*.85,0,0,7); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.beginPath(); ctx.ellipse(r*.55+cr*.5,r*.3-cr*.4,cr*.25,cr*.14,-.4,0,7); ctx.fill();
+  } else if(G.cheek>0){ ctx.fillStyle=`rgba(230,40,50,${.65*G.cheek})`; ctx.beginPath(); ctx.ellipse(r*.5,r*.3,r*.38,r*.26,-.3,0,7); ctx.fill(); }
   ctx.fillStyle='#2a1a10'; ctx.beginPath(); ctx.arc(-r*.1,-r*.1,r*.98,Math.PI*.75,Math.PI*1.6); ctx.lineTo(-r*.2,-r*.3); ctx.fill();
   ctx.fillStyle='#d4935f'; ctx.beginPath(); ctx.ellipse(-r*.2,r*.05,r*.18,r*.26,0,0,7); ctx.fill();
-  if(G.cheek>0){ ctx.fillStyle=`rgba(230,40,50,${.65*G.cheek})`; ctx.beginPath(); ctx.ellipse(r*.5,r*.3,r*.38,r*.26,-.3,0,7); ctx.fill(); }
-  ctx.strokeStyle='#1a1010'; ctx.fillStyle='#1a1010'; ctx.lineWidth=Math.max(2,r*.12); ctx.lineCap='round';
-  if(G.hit>0){
+  ctx.strokeStyle='#1a1010'; ctx.fillStyle='#1a1010'; ctx.lineWidth=Math.max(2,r*.1); ctx.lineCap='round';
+  if(G.dizzy>0 && G.hit<=0){
+    // ตาเป็นก้นหอย ลิ้นห้อย ฟันหลอ
+    for(const [ex,ey] of [[r*.45,-r*.2],[r*.05,-r*.25]]){ ctx.beginPath(); for(let k=0;k<26;k++){ const an=k*.55+G.t*9, rr=k*r*.009; ctx.lineTo(ex+Math.cos(an)*rr,ey+Math.sin(an)*rr); } ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(r*.25,r*.55); for(let k=0;k<=6;k++) ctx.lineTo(r*.25+k*r*.09,r*.55+(k%2?r*.08:-r*.02)); ctx.stroke();
+    ctx.fillStyle='#ff7a8a'; ctx.beginPath(); ctx.ellipse(r*.55,r*.72+Math.sin(G.t*6)*r*.04,r*.13,r*.2,.2,0,7); ctx.fill();
+  } else if(G.hit>0){
     const ex=r*.5,ey=-r*.15,s=r*.16;
     ctx.beginPath(); ctx.moveTo(ex-s,ey-s); ctx.lineTo(ex+s,ey+s); ctx.moveTo(ex+s,ey-s); ctx.lineTo(ex-s,ey+s); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(r*.62,r*.5,r*.14,r*.2,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r*.62,r*.5,r*.15,r*.22,0,0,7); ctx.fill();
   } else {
     ctx.beginPath(); ctx.arc(r*.5,-r*.15,r*.12,0,7); ctx.fill();
     ctx.beginPath(); ctx.moveTo(r*.45,r*.48); ctx.quadraticCurveTo(r*.65,r*.58,r*.8,r*.45); ctx.stroke();
   }
-  // งอบ
+  if(!G.hatOff) drawHat(r);
+  ctx.restore();
+  if(G.hit>0 || G.dizzy>0){ // ดาว + นกบินวนหัว
+    const cx=L.head.x+jerk, cy=L.head.y-r*1.4;
+    for(let i=0;i<3;i++){ const an=G.t*6+i*2.1; ctx.fillStyle='#ffe066'; star(cx+Math.cos(an)*r*1.6, cy+Math.sin(an)*r*.45, r*.3); }
+    if(G.dizzy>0) for(let i=0;i<3;i++){ const an=-G.t*4+i*2.1, bx2=cx+Math.cos(an)*r*1.9, by2=cy-r*.3+Math.sin(an)*r*.5, fl=Math.sin(G.t*20+i)*r*.2;
+      ctx.strokeStyle='#3a3a3a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(bx2-r*.35,by2-fl); ctx.quadraticCurveTo(bx2-r*.15,by2-r*.2,bx2,by2); ctx.quadraticCurveTo(bx2+r*.15,by2-r*.2,bx2+r*.35,by2-fl); ctx.stroke(); }
+  }
+}
+function drawHat(r){
   const hat=ctx.createLinearGradient(0,-r*2,0,-r*.3); hat.addColorStop(0,'#f2d68e'); hat.addColorStop(1,'#b98a3e');
   ctx.fillStyle=hat; ctx.beginPath(); ctx.moveTo(-r*2.1,-r*.35); ctx.lineTo(0,-r*2); ctx.lineTo(r*2.1,-r*.35); ctx.quadraticCurveTo(0,-r*.05,-r*2.1,-r*.35); ctx.fill();
   ctx.strokeStyle='rgba(90,60,20,.45)'; ctx.lineWidth=1;
   for(let i=-4;i<=4;i++){ ctx.beginPath(); ctx.moveTo(0,-r*2); ctx.lineTo(r*2.1*i/4.4,-r*.3+Math.abs(i)*-.02*r); ctx.stroke(); }
   ctx.strokeStyle='#7a3a1a'; ctx.lineWidth=r*.15; ctx.beginPath(); ctx.moveTo(-r*.95,-r*1.0); ctx.quadraticCurveTo(0,-r*.82,r*.95,-r*1.0); ctx.stroke();
-  ctx.restore();
-  if(G.hit>0){ // ดาววนหัว
-    for(let i=0;i<3;i++){ const a=G.t*8+i*2.1; ctx.fillStyle='#ffe066'; star(L.head.x+jerk+Math.cos(a)*r*1.4, L.head.y-r*1.8+Math.sin(a)*r*.4, r*.3); }
-  }
+}
+function drawFlyers(L){
+  const r=L.headR;
+  if(G.hatOff){ const h=G.hatOff; ctx.save(); ctx.translate(h.x,h.y+r*1.1); ctx.rotate(h.rot); drawHat(r); ctx.restore(); }
+  if(G.tooth){ const o=G.tooth; ctx.save(); ctx.translate(o.x,o.y); ctx.rotate(o.rot); ctx.fillStyle='#fff'; ctx.strokeStyle='#888'; ctx.lineWidth=1;
+    rrect(-r*.15,-r*.2,r*.3,r*.4,r*.08); ctx.fill(); ctx.stroke(); ctx.restore(); }
 }
 function star(x,y,s){ ctx.beginPath(); for(let i=0;i<10;i++){ const a=i*Math.PI/5-Math.PI/2, rr=i%2?s*.45:s; ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr); } ctx.closePath(); ctx.fill(); }
 
@@ -641,7 +722,7 @@ function draw(){
   if(G.shake>0){ const m=L.S*2.5*G.shake/.32; ctx.translate((Math.random()-.5)*m,(Math.random()-.5)*m); }
   drawScene(L);
   G.fish.filter(f=>f.state==='swim'||f.state==='sink').forEach(drawFish);
-  drawMan(L); drawBoat(L);
+  drawMan(L); drawBoat(L); drawFlyers(L);
   const r=G.rod;
   if(r){
     const p=tip(L);
