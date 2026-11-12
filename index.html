@@ -148,6 +148,39 @@ function ambient(){ // เสียงคลื่นเบา ๆ วนตล�
     lfo.connect(lg).connect(g.gain); src.connect(f).connect(g).connect(out()); src.start(); lfo.start();
   }catch(e){}
 }
+// ---------- เพลงประกอบ (แต่งใหม่ สังเคราะห์สด บันไดเสียงห้าเสียง เสียงคล้ายระนาด) ----------
+const SCALE=[262,294,330,392,440,523,587,659];
+const MELODY=[
+  [0,-1,2,3, 4,-1,3,2],[1,-1,2,-1, 0,-1,-1,-1],[4,-1,5,4, 3,-1,2,3],[4,-1,-1,-1, -1,-1,-1,-1],
+  [5,-1,4,3, 4,-1,2,-1],[3,-1,2,1, 2,-1,-1,-1],[0,1,2,-1, 3,2,1,-1],[0,-1,-1,-1, -1,-1,-1,-1]];
+const ROOTS=[131,110,147,98,131,110,147,131];
+let MUS=null;
+function mNote(f,t,dur,v,type){
+  const A=ac(), o=A.createOscillator(), g=A.createGain();
+  o.type=type||'sine'; o.frequency.value=f;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(v,t+.008); g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+  o.connect(g).connect(MUS.g); o.start(t); o.stop(t+dur+.02);
+}
+function mStep(i,t){
+  const bar=Math.floor(i/8)%8, st=i%8, n=MELODY[bar][st];
+  if(n>=0){ mNote(SCALE[n],t,.45,.16); mNote(SCALE[n]*4,t,.12,.025); }       // ระนาด: เสียงหลัก + เสียงไม้กระทบ
+  if(st===0||st===4) mNote(ROOTS[bar]*(st?1.5:1),t,.7,.13,'triangle');       // เบส
+  if(st%2===1) mNote(SCALE[(bar+st)%5+3]*2,t,.08,.02);                        // เสียงฉิ่งเบา ๆ จังหวะยก
+}
+function music(){
+  if(MUS) return;
+  try{
+    const A=ac(), g=A.createGain(); g.gain.value=0; g.connect(out());
+    MUS={g,next:A.currentTime+.15,step:0};
+    setInterval(()=>{
+      const A=ac(), ph=G.phase;
+      const target = (ph==='play'||ph==='intro') ? .55 : (ph==='over'||ph==='menu') ? .35 : .07; // ลุ้น/ตบ = เบาลง
+      MUS.g.gain.setTargetAtTime(target,A.currentTime,.35);
+      if(MUS.next<A.currentTime) MUS.next=A.currentTime+.05;
+      while(MUS.next<A.currentTime+.3){ mStep(MUS.step,MUS.next); MUS.step=(MUS.step+1)%64; MUS.next+=60/104/2; }
+    },90);
+  }catch(e){}
+}
 let TH_VOICE=null;
 function loadVoice(){ try{ TH_VOICE=speechSynthesis.getVoices().find(v=>/^th/i.test(v.lang))||null; }catch(e){} }
 try{ loadVoice(); speechSynthesis.onvoiceschanged=loadVoice; }catch(e){}
@@ -234,7 +267,7 @@ function later(fn,ms){ const id=G.run; setTimeout(()=>{ if(G.run===id && G.phase
 function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function startGame(){
-  G.round = scores.length+1; G.t0 = Date.now(); ambient();
+  G.round = scores.length+1; G.t0 = Date.now(); ambient(); music();
   Object.assign(G,{run:G.run+1,score:0,lives:LIVES,correct:0,qn:0,goldUsed:false,goldAfter:1+Math.floor(Math.random()*3),cheek:0});
   hud(); startQuestion();
 }
